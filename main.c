@@ -1,5 +1,5 @@
-#include "asi.h"
-#include "gerador.h"
+#include "./acesso sequencial indexado/asi.h"
+#include "./gerador bin/gerador.h"
 #include <stdio.h>
 #include <stdlib.h>
 

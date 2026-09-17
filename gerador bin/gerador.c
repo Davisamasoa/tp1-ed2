@@ -1,6 +1,6 @@
 #define _POSIX_C_SOURCE 200112L
 #include "gerador.h"
-#include "asi.h"
+#include "../acesso sequencial indexado/asi.h"
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
