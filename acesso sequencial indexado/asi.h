@@ -16,7 +16,7 @@ typedef struct {
 typedef struct {
   int chave;
   long dado1;
-  char dado2[5000];
+  char dado2[10];
 } tipoRegistro;
 
 int acessoSequencial();

@@ -7,7 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define TAM_DADO2 5000
+#define TAM_DADO2 10
 
 static void preencherDado2(char *buf, unsigned int *seedp) {
   static const char alfabeto[] =
