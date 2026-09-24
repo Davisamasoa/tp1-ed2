@@ -1,22 +1,14 @@
 #define _POSIX_C_SOURCE 200112L
 #include "gerador.h"
-#include "../acesso sequencial indexado/asi.h"
+#include "../registro.h"
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#define TAM_DADO2 10
-
-static void preencherDado2(char *buf, unsigned int *seedp) {
-  static const char alfabeto[] =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ";
-  int n = sizeof(alfabeto) - 1;
-  for (int i = 0; i < TAM_DADO2 - 1; i++) {
-    buf[i] = alfabeto[rand_r(seedp) % n];
-  }
-  buf[TAM_DADO2 - 1] = '\0';
+static void preencherDado2(char *buf, size_t tam, int chave) {
+  snprintf(buf, tam, "texto %d", chave);
 }
 
 static void embaralhar(int *vet, int n, unsigned int *seedp) {
@@ -67,7 +59,7 @@ int gerarArquivo(const char *nomeArquivo, long quantidade, int situacao,
 
   unsigned int seedDados = seed + 1;
   const long LOTE = 1024;
-  tipoRegistro *buffer = malloc(sizeof(tipoRegistro) * LOTE);
+  TipoRegistro *buffer = malloc(sizeof(TipoRegistro) * LOTE);
   if (!buffer) {
     fprintf(stderr, "Erro: memoria insuficiente para buffer de escrita.\n");
     fclose(f);
@@ -79,12 +71,12 @@ int gerarArquivo(const char *nomeArquivo, long quantidade, int situacao,
   while (escritos < quantidade) {
     long lote = (quantidade - escritos < LOTE) ? (quantidade - escritos) : LOTE;
     for (long i = 0; i < lote; i++) {
-      tipoRegistro *r = &buffer[i];
+      TipoRegistro *r = &buffer[i];
       r->chave = chaves[escritos + i];
       r->dado1 = (long)rand_r(&seedDados) * (long)rand_r(&seedDados);
-      preencherDado2(r->dado2, &seedDados);
+      preencherDado2(r->dado2, sizeof(r->dado2), r->chave);
     }
-    size_t gravados = fwrite(buffer, sizeof(tipoRegistro), lote, f);
+    size_t gravados = fwrite(buffer, sizeof(TipoRegistro), lote, f);
     if ((long)gravados != lote) {
       fprintf(stderr, "Erro de escrita no arquivo (disco cheio?).\n");
       fclose(f);

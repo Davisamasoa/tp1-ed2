@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int pesquisa(tipoIndice tab[], int tam, tipoRegistro *item, FILE *arq) {
-  tipoRegistro pagina[ITENSPAGINA];
+int pesquisa(TipoIndice tab[], int tam, TipoRegistro *item, FILE *arq) {
+  TipoRegistro pagina[ITENSPAGINA];
   int i, quantItens;
   long desloc;
   // procura pela página onde o item pode se encontrar
@@ -19,16 +19,16 @@ int pesquisa(tipoIndice tab[], int tam, tipoRegistro *item, FILE *arq) {
       quantItens = ITENSPAGINA;
     else {
       fseek(arq, 0, SEEK_END);
-      int quant = (ftell(arq) / sizeof(tipoRegistro)) % ITENSPAGINA;
+      int quant = (ftell(arq) / sizeof(TipoRegistro)) % ITENSPAGINA;
       if (quant == 0)
         quantItens = ITENSPAGINA;
       else
         quantItens = quant;
     }
     // lê a página desejada do arquivo
-    desloc = (tab[i - 1].posicao - 1) * ITENSPAGINA * sizeof(tipoRegistro);
+    desloc = (tab[i - 1].posicao - 1) * ITENSPAGINA * sizeof(TipoRegistro);
     fseek(arq, desloc, SEEK_SET);
-    fread(&pagina, sizeof(tipoRegistro), quantItens, arq);
+    fread(&pagina, sizeof(TipoRegistro), quantItens, arq);
     // pesquisa sequencial na página lida
     for (i = 0; i < quantItens; i++)
       if (pagina[i].chave == item->chave) {
@@ -40,9 +40,9 @@ int pesquisa(tipoIndice tab[], int tam, tipoRegistro *item, FILE *arq) {
 }
 
 int acessoSequencial() {
-  tipoIndice tabela[MAXTABELA];
+  TipoIndice tabela[MAXTABELA];
   FILE *arq;
-  tipoRegistro x;
+  TipoRegistro x;
   int pos;
 
   // abre o arquivo de dados

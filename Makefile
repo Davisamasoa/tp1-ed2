@@ -7,34 +7,39 @@ space:= $(empty) $(empty)
 
 ASI_DIR := acesso sequencial indexado
 GER_DIR := gerador bin
-AV_DIR  := pesquisa binaria
+PB_DIR  := pesquisa binaria
+AVB_DIR := arvore B
 
 ASI_DIR_ESC := $(subst $(space),\ ,$(ASI_DIR))
 GER_DIR_ESC := $(subst $(space),\ ,$(GER_DIR))
-AV_DIR_ESC  := $(subst $(space),\ ,$(AV_DIR))
+PB_DIR_ESC  := $(subst $(space),\ ,$(PB_DIR))
+AVB_DIR_ESC := $(subst $(space),\ ,$(AVB_DIR))
 
-CFLAGS += -I"$(ASI_DIR)" -I"$(GER_DIR)" -I"$(AV_DIR)"
+CFLAGS += -I"$(ASI_DIR)" -I"$(GER_DIR)" -I"$(PB_DIR)" -I"$(AVB_DIR)"
 
-OBJS = main.o $(ASI_DIR_ESC)/asi.o $(GER_DIR_ESC)/gerador.o $(AV_DIR_ESC)/av.o
+OBJS = main.o $(ASI_DIR_ESC)/asi.o $(GER_DIR_ESC)/gerador.o $(PB_DIR_ESC)/pB.o $(AVB_DIR_ESC)/avB.o
 
 .PHONY: all run clean
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $(TARGET) main.o "$(ASI_DIR)/asi.o" "$(GER_DIR)/gerador.o" "$(AV_DIR)/av.o"
+	$(CC) $(CFLAGS) -o $(TARGET) main.o "$(ASI_DIR)/asi.o" "$(GER_DIR)/gerador.o" "$(PB_DIR)/pB.o" "$(AVB_DIR)/avB.o"
 
-main.o: main.c $(ASI_DIR_ESC)/asi.h $(GER_DIR_ESC)/gerador.h $(AV_DIR_ESC)/av.h
+main.o: main.c $(ASI_DIR_ESC)/asi.h $(GER_DIR_ESC)/gerador.h $(PB_DIR_ESC)/pB.h $(AVB_DIR_ESC)/avB.h registro.h
 	$(CC) $(CFLAGS) -c main.c -o main.o
 
-$(ASI_DIR_ESC)/asi.o: $(ASI_DIR_ESC)/asi.c $(ASI_DIR_ESC)/asi.h
+$(ASI_DIR_ESC)/asi.o: $(ASI_DIR_ESC)/asi.c $(ASI_DIR_ESC)/asi.h registro.h
 	$(CC) $(CFLAGS) -c "$(ASI_DIR)/asi.c" -o "$(ASI_DIR)/asi.o"
 
-$(GER_DIR_ESC)/gerador.o: $(GER_DIR_ESC)/gerador.c $(GER_DIR_ESC)/gerador.h $(ASI_DIR_ESC)/asi.h
+$(GER_DIR_ESC)/gerador.o: $(GER_DIR_ESC)/gerador.c $(GER_DIR_ESC)/gerador.h registro.h
 	$(CC) $(CFLAGS) -c "$(GER_DIR)/gerador.c" -o "$(GER_DIR)/gerador.o"
 
-$(AV_DIR_ESC)/av.o: $(AV_DIR_ESC)/av.c $(AV_DIR_ESC)/av.h $(ASI_DIR_ESC)/asi.h
-	$(CC) $(CFLAGS) -c "$(AV_DIR)/av.c" -o "$(AV_DIR)/av.o"
+$(PB_DIR_ESC)/pB.o: $(PB_DIR_ESC)/pB.c $(PB_DIR_ESC)/pB.h registro.h
+	$(CC) $(CFLAGS) -c "$(PB_DIR)/pB.c" -o "$(PB_DIR)/pB.o"
+
+$(AVB_DIR_ESC)/avB.o: $(AVB_DIR_ESC)/avB.c $(AVB_DIR_ESC)/avB.h registro.h
+	$(CC) $(CFLAGS) -c "$(AVB_DIR)/avB.c" -o "$(AVB_DIR)/avB.o"
 
 run: $(TARGET)
 	./$(TARGET)

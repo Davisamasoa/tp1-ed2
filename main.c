@@ -1,6 +1,7 @@
 #include "./acesso sequencial indexado/asi.h"
 #include "./gerador bin/gerador.h"
-#include "./pesquisa binaria/av.h"
+#include "./pesquisa binaria/pB.h"
+#include "./arvore B/avB.h"
 #include <stdio.h>
 #include <stdlib.h>
 

@@ -1,11 +1,11 @@
-#ifndef AV_H
-#define AV_H
+#ifndef PB_H
+#define PB_H
 
-#include "../acesso sequencial indexado/asi.h"
+#include "../registro.h"
 
 typedef struct {
     long esq; 
-    tipoRegistro arvoreBinaria;
+    TipoRegistro arvoreBinaria;
     long dir; 
 } Nodo;
 

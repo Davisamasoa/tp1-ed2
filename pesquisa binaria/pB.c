@@ -1,4 +1,5 @@
-#include "av.h"
+#include "pB.h"
+#include "../registro.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -7,13 +8,13 @@ int construirArvoreBinaria(char *gerador, char *nomeArquivoArvore) {
   arq = fopen(gerador, "rb");
   arvore = fopen(nomeArquivoArvore, "wb+");
 
-  tipoRegistro Lido;
+  TipoRegistro Lido;
   Nodo novo, atual;
   long totalNodos = 0;
   long posNovoNodo;
 
   // Lê registro por registro do arquivo de entrada
-  while (fread(&Lido, sizeof(tipoRegistro), 1, arq) == 1) {
+  while (fread(&Lido, sizeof(TipoRegistro), 1, arq) == 1) {
     // dados iniciais salvos no arquivo
     novo.esq = -1;
     novo.arvoreBinaria = Lido;

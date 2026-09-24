@@ -20,7 +20,7 @@ typedef struct {
   int  chave;
   long dado1;
   char dado2[5000];
-} tipoRegistro;
+} TipoRegistro;
 ```
 
 ## Requisitos

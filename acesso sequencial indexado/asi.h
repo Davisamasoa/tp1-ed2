@@ -1,6 +1,8 @@
 #ifndef ASI_H
 #define ASI_H
 
+#include "../registro.h"
+
 // ACESSO SEQUENCIAL INDEXADO
 
 #define ITENSPAGINA 100
@@ -10,14 +12,7 @@
 typedef struct {
   int posicao;
   int chave;
-} tipoIndice;
-
-// definição de um item do arquivo de dados
-typedef struct {
-  int chave;
-  long dado1;
-  char dado2[10];
-} tipoRegistro;
+} TipoIndice;
 
 int acessoSequencial();
 
