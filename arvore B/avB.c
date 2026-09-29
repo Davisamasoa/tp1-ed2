@@ -2,104 +2,135 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void Inicializa(TipoApontador *Arvore) { *Arvore = NULL; }
+void inicializarArvoreB(TipoApontador *raiz) { *raiz = NULL; }
 
-void Insere(TipoRegistro Reg, TipoApontador *Ap) {
-  short Cresceu;
-  TipoRegistro RegRetorno;
-  TipoPagina *ApRetorno, *ApTemp;
-  Ins(Reg, *Ap, &Cresceu, &RegRetorno, &ApRetorno);
-  if (Cresceu) /* Arvore cresce na altura pela raiz */
+void inserirNaArvoreB(TipoRegistro registro, TipoApontador *raiz) {
+  short cresceu;
+  TipoRegistro registroPromovido;
+  TipoPagina *filhoPromovido, *novaRaiz;
+  inserirRecursivo(registro, *raiz, &cresceu, &registroPromovido,
+                   &filhoPromovido);
+  if (cresceu) /* Arvore cresce na altura pela raiz */
   {
-    ApTemp = (TipoPagina *)malloc(sizeof(TipoPagina));
-    ApTemp->n = 1;
-    ApTemp->r[0] = RegRetorno;
-    ApTemp->p[1] = ApRetorno;
-    ApTemp->p[0] = *Ap;
-    *Ap = ApTemp;
+    novaRaiz = (TipoPagina *)malloc(sizeof(TipoPagina));
+    novaRaiz->quantidade = 1;
+    novaRaiz->registros[0] = registroPromovido;
+    novaRaiz->filhos[1] = filhoPromovido;
+    novaRaiz->filhos[0] = *raiz;
+    *raiz = novaRaiz;
   }
 }
-void InsereNaPagina(TipoApontador Ap, TipoRegistro Reg, TipoApontador ApDir) {
-  short NaoAchouPosicao;
-  int k;
-  k = Ap->n;
-  NaoAchouPosicao = (k > 0);
-  while (NaoAchouPosicao) {
-    if (Reg.chave >= Ap->r[k - 1].chave) {
-      NaoAchouPosicao = FALSE;
+void inserirNaPagina(TipoApontador pagina, TipoRegistro registro,
+                     TipoApontador filhoDireito) {
+  short procurandoPosicao;
+  int posicao;
+  posicao = pagina->quantidade;
+  procurandoPosicao = (posicao > 0);
+  while (procurandoPosicao) {
+    if (registro.chave >= pagina->registros[posicao - 1].chave) {
+      procurandoPosicao = FALSE;
       break;
     }
-    Ap->r[k] = Ap->r[k - 1];
-    Ap->p[k + 1] = Ap->p[k];
-    k--;
-    if (k < 1)
-      NaoAchouPosicao = FALSE;
+    pagina->registros[posicao] = pagina->registros[posicao - 1];
+    pagina->filhos[posicao + 1] = pagina->filhos[posicao];
+    posicao--;
+    if (posicao < 1)
+      procurandoPosicao = FALSE;
   }
-  Ap->r[k] = Reg;
-  Ap->p[k + 1] = ApDir;
-  Ap->n++;
+  pagina->registros[posicao] = registro;
+  pagina->filhos[posicao + 1] = filhoDireito;
+  pagina->quantidade++;
 }
-void Ins(TipoRegistro Reg, TipoApontador Ap, short *Cresceu,
-         TipoRegistro *RegRetorno, TipoApontador *ApRetorno) {
-  long i = 1;
+void inserirRecursivo(TipoRegistro registro, TipoApontador pagina,
+                      short *cresceu, TipoRegistro *registroPromovido,
+                      TipoApontador *filhoPromovido) {
+  long posicao = 1;
   long j;
-  TipoApontador ApTemp;
-  if (Ap == NULL) {
-    *Cresceu = TRUE;
-    (*RegRetorno) = Reg;
-    (*ApRetorno) = NULL;
+  TipoApontador novaPagina;
+  if (pagina == NULL) {
+    *cresceu = TRUE;
+    (*registroPromovido) = registro;
+    (*filhoPromovido) = NULL;
     return;
   }
-  while (i < Ap->n && Reg.chave > Ap->r[i - 1].chave)
-    i++;
-  if (Reg.chave == Ap->r[i - 1].chave) {
+  while (posicao < pagina->quantidade &&
+         registro.chave > pagina->registros[posicao - 1].chave)
+    posicao++;
+  if (registro.chave == pagina->registros[posicao - 1].chave) {
     printf("Erro: Registro ja esta presente\n");
-    *Cresceu = FALSE;
+    *cresceu = FALSE;
     return;
   }
-  if (Reg.chave < Ap->r[i - 1].chave)
-    i--;
-  Ins(Reg, Ap->p[i], Cresceu, RegRetorno, ApRetorno);
-  if (!*Cresceu)
+  if (registro.chave < pagina->registros[posicao - 1].chave)
+    posicao--;
+  inserirRecursivo(registro, pagina->filhos[posicao], cresceu,
+                   registroPromovido, filhoPromovido);
+  if (!*cresceu)
     return;
-  if (Ap->n < MM) /* Pagina tem espaco */
+  if (pagina->quantidade < MAX_REGISTROS) /* Pagina tem espaco */
   {
-    InsereNaPagina(Ap, *RegRetorno, *ApRetorno);
-    *Cresceu = FALSE;
+    inserirNaPagina(pagina, *registroPromovido, *filhoPromovido);
+    *cresceu = FALSE;
     return;
   }
   /* Overflow: Pagina tem que ser dividida */
-  ApTemp = (TipoApontador)malloc(sizeof(TipoPagina));
-  ApTemp->n = 0;
-  ApTemp->p[0] = NULL;
-  if (i < M + 1) {
-    InsereNaPagina(ApTemp, Ap->r[MM - 1], Ap->p[MM]);
-    Ap->n--;
-    InsereNaPagina(Ap, *RegRetorno, *ApRetorno);
+  novaPagina = (TipoApontador)malloc(sizeof(TipoPagina));
+  novaPagina->quantidade = 0;
+  novaPagina->filhos[0] = NULL;
+  if (posicao < ORDEM + 1) {
+    inserirNaPagina(novaPagina, pagina->registros[MAX_REGISTROS - 1],
+                    pagina->filhos[MAX_REGISTROS]);
+    pagina->quantidade--;
+    inserirNaPagina(pagina, *registroPromovido, *filhoPromovido);
   } else
-    InsereNaPagina(ApTemp, *RegRetorno, *ApRetorno);
-  for (j = M + 2; j <= MM; j++)
-    InsereNaPagina(ApTemp, Ap->r[j - 1], Ap->p[j]);
-  Ap->n = M;
-  ApTemp->p[0] = Ap->p[M + 1];
-  *RegRetorno = Ap->r[M];
-  *ApRetorno = ApTemp;
+    inserirNaPagina(novaPagina, *registroPromovido, *filhoPromovido);
+  for (j = ORDEM + 2; j <= MAX_REGISTROS; j++)
+    inserirNaPagina(novaPagina, pagina->registros[j - 1], pagina->filhos[j]);
+  pagina->quantidade = ORDEM;
+  novaPagina->filhos[0] = pagina->filhos[ORDEM + 1];
+  *registroPromovido = pagina->registros[ORDEM];
+  *filhoPromovido = novaPagina;
 }
 
-void Pesquisa(TipoRegistro *x, TipoApontador Ap) {
-  long i = 1;
-  if (Ap == NULL) {
+/*void pesquisarNaArvoreB(TipoRegistro *registro, TipoApontador pagina) {
+  long posicao = 1;
+  if (pagina == NULL) {
     printf("TipoRegistro nao esta presente na arvore\n");
     return;
   }
-  while (i < Ap->n && x->chave > Ap->r[i - 1].chave)
-    i++;
-  if (x->chave == Ap->r[i - 1].chave) {
-    *x = Ap->r[i - 1];
+  while (posicao < pagina->quantidade &&
+         registro->chave > pagina->registros[posicao - 1].chave)
+    posicao++;
+  if (registro->chave == pagina->registros[posicao - 1].chave) {
+    *registro = pagina->registros[posicao - 1];
     return;
   }
-  if (x->chave < Ap->r[i - 1].chave)
-    Pesquisa(x, Ap->p[i - 1]);
+  if (registro->chave < pagina->registros[posicao - 1].chave)
+    pesquisarNaArvoreB(registro, pagina->filhos[posicao - 1]);
   else
-    Pesquisa(x, Ap->p[i]);
+    pesquisarNaArvoreB(registro, pagina->filhos[posicao]);
+}
+*/
+
+void pesquisarNaArvoreB(TipoRegistro *registro, TipoApontador pagina) {
+  while (pagina != NULL) {
+    int esq = 0, dir = pagina->quantidade - 1, meio;
+
+    // Busca binária dentro da página
+    while (esq <= dir) {
+      meio = esq + (dir - esq) / 2;
+
+      if (registro->chave == pagina->registros[meio].chave) {
+        *registro = pagina->registros[meio];
+        return; // Encontrou
+      }
+      if (registro->chave < pagina->registros[meio].chave)
+        dir = meio - 1;
+      else
+        esq = meio + 1;
+    }
+    // Se não encontrou, 'esq' aponta para o ponteiro do filho correto
+    pagina = pagina->filhos[esq];
+  }
+  printf("Registro nao esta presente na arvore\n");
 }

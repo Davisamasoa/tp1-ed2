@@ -5,15 +5,15 @@
 
 // ACESSO SEQUENCIAL INDEXADO
 
-#define ITENSPAGINA 100
-#define MAXTABELA 20000
+#define ITENS_POR_PAGINA 100
+#define MAX_PAGINAS 20000
 
 // definição de uma entrada da tabela de índice das páginas
 typedef struct {
-  int posicao;
-  int chave;
+  int numeroPagina;
+  int primeiraChave;
 } TipoIndice;
 
-int acessoSequencial();
+int acessoSequencialIndexado();
 
 #endif

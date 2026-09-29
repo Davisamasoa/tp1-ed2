@@ -3,29 +3,29 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int construirArvoreBinaria(char *gerador, char *nomeArquivoArvore) {
-  FILE *arq, *arvore;
-  arq = fopen(gerador, "rb");
-  arvore = fopen(nomeArquivoArvore, "wb+");
+int construirArvoreBinaria(char *nomeArquivoRegistros, char *nomeArquivoArvore) {
+  FILE *arquivoRegistros, *arquivoArvore;
+  arquivoRegistros = fopen(nomeArquivoRegistros, "rb");
+  arquivoArvore = fopen(nomeArquivoArvore, "wb+");
 
-  TipoRegistro Lido;
-  Nodo novo, atual;
+  TipoRegistro registroLido;
+  Nodo novoNodo, nodoAtual;
   long totalNodos = 0;
   long posNovoNodo;
 
   // Lê registro por registro do arquivo de entrada
-  while (fread(&Lido, sizeof(TipoRegistro), 1, arq) == 1) {
+  while (fread(&registroLido, sizeof(TipoRegistro), 1, arquivoRegistros) == 1) {
     // dados iniciais salvos no arquivo
-    novo.esq = -1;
-    novo.arvoreBinaria = Lido;
-    novo.dir = -1;
+    novoNodo.esquerda = -1;
+    novoNodo.registro = registroLido;
+    novoNodo.direita = -1;
 
     // a posicao do novo nodo sera ao total atual
     posNovoNodo = totalNodos;
 
     if (posNovoNodo == 0) {
       // insere na raiz pois ainda nao ha nodos
-      fwrite(&novo, sizeof(Nodo), 1, arvore);
+      fwrite(&novoNodo, sizeof(Nodo), 1, arquivoArvore);
       totalNodos++;
     } else {
       // a árvore já tem nodos, precisamos achar onde inserir
@@ -34,46 +34,46 @@ int construirArvoreBinaria(char *gerador, char *nomeArquivoArvore) {
 
       while (!inserido) {
         // lê o nodo atual para comparar a chave
-        fseek(arvore, posAtual * sizeof(Nodo), SEEK_SET);
-        fread(&atual, sizeof(Nodo), 1, arvore);
+        fseek(arquivoArvore, posAtual * sizeof(Nodo), SEEK_SET);
+        fread(&nodoAtual, sizeof(Nodo), 1, arquivoArvore);
 
-        if (Lido.chave < atual.arvoreBinaria.chave) {
+        if (registroLido.chave < nodoAtual.registro.chave) {
           // vai para a esquerda se a chave for menor
-          if (atual.esq == -1) {
+          if (nodoAtual.esquerda == -1) {
             // achou o espaço vazio
             // atualiza o ponteiro esquerdo do pai
-            atual.esq = posNovoNodo;
-            fseek(arvore, posAtual * sizeof(Nodo), SEEK_SET);
-            fwrite(&atual, sizeof(Nodo), 1, arvore);
+            nodoAtual.esquerda = posNovoNodo;
+            fseek(arquivoArvore, posAtual * sizeof(Nodo), SEEK_SET);
+            fwrite(&nodoAtual, sizeof(Nodo), 1, arquivoArvore);
 
             // grava o novo nodo lá no final do arquivo
-            fseek(arvore, 0, SEEK_END);
-            fwrite(&novo, sizeof(Nodo), 1, arvore);
+            fseek(arquivoArvore, 0, SEEK_END);
+            fwrite(&novoNodo, sizeof(Nodo), 1, arquivoArvore);
             inserido = 1;
             // incremeta o total de nodos
             totalNodos++;
           } else {
             // enquanto nao achar, continua descendo pela esquerda
-            posAtual = atual.esq;
+            posAtual = nodoAtual.esquerda;
           }
-        } else if (Lido.chave > atual.arvoreBinaria.chave) {
+        } else if (registroLido.chave > nodoAtual.registro.chave) {
           // vai para a direita se a chave for maior
-          if (atual.dir == -1) {
+          if (nodoAtual.direita == -1) {
             // achou o espaço vazio
             // atualiza o ponteiro direito do pai
-            atual.dir = posNovoNodo;
-            fseek(arvore, posAtual * sizeof(Nodo), SEEK_SET);
-            fwrite(&atual, sizeof(Nodo), 1, arvore);
+            nodoAtual.direita = posNovoNodo;
+            fseek(arquivoArvore, posAtual * sizeof(Nodo), SEEK_SET);
+            fwrite(&nodoAtual, sizeof(Nodo), 1, arquivoArvore);
 
             // grava o novo nodo lá no final do arquivo
-            fseek(arvore, 0, SEEK_END);
-            fwrite(&novo, sizeof(Nodo), 1, arvore);
+            fseek(arquivoArvore, 0, SEEK_END);
+            fwrite(&novoNodo, sizeof(Nodo), 1, arquivoArvore);
             inserido = 1;
             // incrementa o total de nodos
             totalNodos++;
           } else {
             // continua descendo pela direita enquanto nao achar
-            posAtual = atual.dir;
+            posAtual = nodoAtual.direita;
           }
         } else {
           return 0;
@@ -82,50 +82,50 @@ int construirArvoreBinaria(char *gerador, char *nomeArquivoArvore) {
     }
   }
 
-  fclose(arq);
-  fclose(arvore);
+  fclose(arquivoRegistros);
+  fclose(arquivoArvore);
   return 1;
 }
 
-void pesquisarNaArvore(char *nomeArquivoArvore) {
+void pesquisarNaArvoreBinaria(char *nomeArquivoArvore) {
   int chaveBuscada;
 
   printf("Digite o número da chave que deseja buscar: ");
   scanf("%d", &chaveBuscada);
 
-  FILE *arvore;
-  arvore = fopen(nomeArquivoArvore, "rb");
-  if (arvore == NULL) {
+  FILE *arquivoArvore;
+  arquivoArvore = fopen(nomeArquivoArvore, "rb");
+  if (arquivoArvore == NULL) {
     printf("Erro ao abrir a arvore para pesquisa.\n");
     return;
   }
 
-  fseek(arvore, 0, SEEK_END);
+  fseek(arquivoArvore, 0, SEEK_END);
   // verifica se a arvore possui algum nodo
-  if (ftell(arvore) == 0) {
+  if (ftell(arquivoArvore) == 0) {
     printf("A arvore esta vazia!\n");
-    fclose(arvore);
+    fclose(arquivoArvore);
     return;
   }
 
   long posAtual = 0; // começa da raiz
-  Nodo atual;
+  Nodo nodoAtual;
   int encontrou = 0;
 
   while (posAtual != -1) {
     // pula para a posição atual e lê o nodo
-    fseek(arvore, posAtual * sizeof(Nodo), SEEK_SET);
-    fread(&atual, sizeof(Nodo), 1, arvore);
+    fseek(arquivoArvore, posAtual * sizeof(Nodo), SEEK_SET);
+    fread(&nodoAtual, sizeof(Nodo), 1, arquivoArvore);
 
-    if (chaveBuscada == atual.arvoreBinaria.chave) {
+    if (chaveBuscada == nodoAtual.registro.chave) {
       printf("Chave %d ENCONTRADA!\n", chaveBuscada);
       encontrou = 1;
-      printf("%ld, %s\n", atual.arvoreBinaria.dado1, atual.arvoreBinaria.dado2);
+      printf("%ld, %s\n", nodoAtual.registro.dado1, nodoAtual.registro.dado2);
       break;
-    } else if (chaveBuscada < atual.arvoreBinaria.chave) {
-      posAtual = atual.esq; // desce para a esquerda
+    } else if (chaveBuscada < nodoAtual.registro.chave) {
+      posAtual = nodoAtual.esquerda; // desce para a esquerda
     } else {
-      posAtual = atual.dir; // desce para a direita
+      posAtual = nodoAtual.direita; // desce para a direita
     }
   }
 
@@ -133,5 +133,5 @@ void pesquisarNaArvore(char *nomeArquivoArvore) {
     printf("Chave %d NAO encontrada na arvore.\n", chaveBuscada);
   }
 
-  fclose(arvore);
+  fclose(arquivoArvore);
 }

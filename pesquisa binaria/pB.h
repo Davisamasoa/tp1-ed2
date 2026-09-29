@@ -4,12 +4,12 @@
 #include "../registro.h"
 
 typedef struct {
-    long esq; 
-    TipoRegistro arvoreBinaria;
-    long dir; 
+    long esquerda; 
+    TipoRegistro registro;
+    long direita; 
 } Nodo;
 
-int construirArvoreBinaria(char *gerador, char *nomeArquivoArvore);
-void pesquisarNaArvore(char *nomeArquivoArvore);
+int construirArvoreBinaria(char *nomeArquivoRegistros, char *nomeArquivoArvore);
+void pesquisarNaArvoreBinaria(char *nomeArquivoArvore);
 
 #endif

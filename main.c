@@ -11,9 +11,9 @@ int main() {
     printf("Erro na criação do arquivo\n");
   }
 
-  // acessoSequencial();
+  // acessoSequencialIndexado();
   construirArvoreBinaria("registros.bin", "arvoreb.bin");
-  pesquisarNaArvore("arvoreb.bin");
+  pesquisarNaArvoreBinaria("arvoreb.bin");
 
   return 0;
 }

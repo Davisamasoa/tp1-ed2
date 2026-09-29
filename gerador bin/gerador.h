@@ -13,13 +13,13 @@
  *   nomeArquivo : caminho/nome do arquivo binario a ser criado
  *   quantidade  : numero de registros a gerar
  *   situacao    : 1 = ascendente, 2 = descendente, 3 = aleatoria
- *   seed        : semente do gerador pseudoaleatorio
+ *   semente     : semente do gerador pseudoaleatorio
  *
  * Retorno:
  *   0 em caso de sucesso, diferente de 0 em caso de erro
  * ---------------------------------------------------------------------
  */
 int gerarArquivo(const char *nomeArquivo, long quantidade, int situacao,
-                 unsigned int seed);
+                 unsigned int semente);
 
 #endif

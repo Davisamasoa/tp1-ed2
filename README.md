@@ -63,13 +63,13 @@ int main() {
     printf("Erro na criação do arquivo\n");
   }
 
-  acessoSequencial();
+  acessoSequencialIndexado();
 
   return 0;
 }
 ```
 
-Parâmetros de `gerarArquivo(nomeArquivo, quantidade, situacao, seed)`:
+Parâmetros de `gerarArquivo(nomeArquivo, quantidade, situacao, semente)`:
 
 - `nomeArquivo`: caminho do arquivo binário a ser criado (ex.: `"registros.bin"`)
 - `quantidade`: número de registros a gerar
@@ -78,12 +78,12 @@ Parâmetros de `gerarArquivo(nomeArquivo, quantidade, situacao, seed)`:
   (descendente) e `3` (aleatória) existem no gerador mas **quebram a busca**
   se usadas diretamente, pois a tabela de índice deixa de ficar em ordem
   crescente entre páginas.
-- `seed`: semente do gerador pseudoaleatório (afeta apenas `dado1`/`dado2`,
+- `semente`: semente do gerador pseudoaleatório (afeta apenas `dado1`/`dado2`,
   não a ordem das chaves quando `situacao = 1`)
 
-> `quantidade` é limitada a `MAXTABELA * ITENSPAGINA` = 20000 × 100 =
+> `quantidade` é limitada a `MAX_PAGINAS * ITENS_POR_PAGINA` = 20000 × 100 =
 > **2.000.000** de registros (limites definidos em `asi.h`). Gerar mais que
-> isso faz `acessoSequencial()` recusar a leitura do arquivo com uma
+> isso faz `acessoSequencialIndexado()` recusar a leitura do arquivo com uma
 > mensagem de erro, em vez de estourar a tabela de índice.
 
 Depois de editar `main.c`, recompile:
@@ -112,7 +112,7 @@ int main() {
   //   printf("Erro na criação do arquivo\n");
   // }
 
-  acessoSequencial();
+  acessoSequencialIndexado();
 
   return 0;
 }
