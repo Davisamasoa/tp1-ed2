@@ -1,6 +1,7 @@
 #ifndef ABESTRELA_H
 #define ABESTRELA_H
 #include "../registro.h"
+#include <stdbool.h>
 #define MAX_CHAVES_INTERNA 4    /* maximo de chaves em uma pagina interna */
 #define MAX_REGISTROS_FOLHA 4   /* maximo de registros em uma pagina folha */
 
@@ -22,7 +23,10 @@ typedef struct TipoPaginaEstrela {
   } conteudo;
 } TipoPaginaEstrela;
 
-void pesquisarNaArvoreBEstrela(TipoRegistro *registro,
+void inicializarAB(TipoApontadorEstrela *raiz);
+void InserirAB(TipoRegistro registro, TipoApontadorEstrela *raiz);
+bool pesquisarNaArvoreBEstrela(TipoRegistro *registro,
                                TipoApontadorEstrela pagina);
+void liberarAB(TipoApontadorEstrela *raiz);
 
 #endif

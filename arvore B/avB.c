@@ -92,26 +92,6 @@ void inserirRecursivo(TipoRegistro registro, TipoApontador pagina,
   *filhoPromovido = novaPagina;
 }
 
-/*void pesquisarNaArvoreB(TipoRegistro *registro, TipoApontador pagina) {
-  long posicao = 1;
-  if (pagina == NULL) {
-    printf("TipoRegistro nao esta presente na arvore\n");
-    return;
-  }
-  while (posicao < pagina->quantidade &&
-         registro->chave > pagina->registros[posicao - 1].chave)
-    posicao++;
-  if (registro->chave == pagina->registros[posicao - 1].chave) {
-    *registro = pagina->registros[posicao - 1];
-    return;
-  }
-  if (registro->chave < pagina->registros[posicao - 1].chave)
-    pesquisarNaArvoreB(registro, pagina->filhos[posicao - 1]);
-  else
-    pesquisarNaArvoreB(registro, pagina->filhos[posicao]);
-}
-*/
-
 void pesquisarNaArvoreB(TipoRegistro *registro, TipoApontador pagina) {
   while (pagina != NULL) {
     int esq = 0, dir = pagina->quantidade - 1, meio;
