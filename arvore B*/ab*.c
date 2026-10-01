@@ -108,7 +108,14 @@ static void inserirRecursivo(const TipoRegistro *registro,
     filhos[j + 1] = *filhoPromovido;
 
     int meio = total / 2;
-    novaPagina = criarPagina(PaginaInterna);
+    // novaPagina = criarPagina(PaginaInterna);
+    novaPagina = (TipoApontadorEstrela)malloc(sizeof(TipoPaginaEstrela));
+    if (novaPagina == NULL) {
+      printf("Erro! Memoria insuficiente\n");
+    }
+    novaPagina->tipo = PaginaInterna;
+    novaPagina->conteudo.interna.quantidadeChaves = 0;
+
     pagina->conteudo.interna.quantidadeChaves = meio;
     for (j = 0; j < meio; j++) {
       pagina->conteudo.interna.chaves[j] = chaves[j];
@@ -138,8 +145,13 @@ static void inserirRecursivo(const TipoRegistro *registro,
       *cresceu = false;
       return;
     }
-    novaPagina = criarPagina(PaginaFolha);
-
+    // novaPagina = criarPagina(PaginaFolha);
+    novaPagina = (TipoApontadorEstrela)malloc(sizeof(TipoPaginaEstrela));
+    if (novaPagina == NULL) {
+      printf("Erro! Memoria insuficiente\n");
+    }
+    novaPagina->tipo = PaginaFolha;
+    novaPagina->conteudo.folha.quantidadeRegistros = 0;
     // encadeamento
 
     int meio = MAX_REGISTROS_FOLHA / 2;
