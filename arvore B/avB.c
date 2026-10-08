@@ -1,6 +1,8 @@
 #include "avB.h"
+#include "../metricas.h"
 #include <stdio.h>
 #include <stdlib.h>
+
 
 void inicializarArvoreB(TipoApontador *raiz) { *raiz = NULL; }
 
@@ -27,7 +29,7 @@ void inserirNaPagina(TipoApontador pagina, TipoRegistro registro,
   posicao = pagina->quantidade;
   procurandoPosicao = (posicao > 0);
   while (procurandoPosicao) {
-    if (registro.chave >= pagina->registros[posicao - 1].chave) {
+    if (COMP(registro.chave >= pagina->registros[posicao - 1].chave)) {
       procurandoPosicao = FALSE;
       break;
     }
@@ -54,14 +56,14 @@ void inserirRecursivo(TipoRegistro registro, TipoApontador pagina,
     return;
   }
   while (posicao < pagina->quantidade &&
-         registro.chave > pagina->registros[posicao - 1].chave)
+         COMP(registro.chave > pagina->registros[posicao - 1].chave))
     posicao++;
-  if (registro.chave == pagina->registros[posicao - 1].chave) {
+  if (COMP(registro.chave == pagina->registros[posicao - 1].chave)) {
     printf("Erro: Registro ja esta presente\n");
     *cresceu = FALSE;
     return;
   }
-  if (registro.chave < pagina->registros[posicao - 1].chave)
+  if (COMP(registro.chave < pagina->registros[posicao - 1].chave))
     posicao--;
   inserirRecursivo(registro, pagina->filhos[posicao], cresceu,
                    registroPromovido, filhoPromovido);
@@ -92,7 +94,7 @@ void inserirRecursivo(TipoRegistro registro, TipoApontador pagina,
   *filhoPromovido = novaPagina;
 }
 
-void pesquisarNaArvoreB(TipoRegistro *registro, TipoApontador pagina) {
+int pesquisarNaArvoreB(TipoRegistro *registro, TipoApontador pagina) {
   while (pagina != NULL) {
     int esq = 0, dir = pagina->quantidade - 1, meio;
 
@@ -100,11 +102,11 @@ void pesquisarNaArvoreB(TipoRegistro *registro, TipoApontador pagina) {
     while (esq <= dir) {
       meio = esq + (dir - esq) / 2;
 
-      if (registro->chave == pagina->registros[meio].chave) {
+      if (COMP(registro->chave == pagina->registros[meio].chave)) {
         *registro = pagina->registros[meio];
-        return; // Encontrou
+        return 1; // Encontrou
       }
-      if (registro->chave < pagina->registros[meio].chave)
+      if (COMP(registro->chave < pagina->registros[meio].chave))
         dir = meio - 1;
       else
         esq = meio + 1;
@@ -112,5 +114,5 @@ void pesquisarNaArvoreB(TipoRegistro *registro, TipoApontador pagina) {
     // Se não encontrou, 'esq' aponta para o ponteiro do filho correto
     pagina = pagina->filhos[esq];
   }
-  printf("Registro nao esta presente na arvore\n");
+  return 0; // Nao encontrou
 }

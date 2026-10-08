@@ -19,14 +19,14 @@ typedef struct TipoPaginaEstrela {
     struct {
       int quantidadeRegistros;
       TipoRegistro registros[MAX_REGISTROS_FOLHA];
+      TipoApontadorEstrela proximo; //encadeamento das folhas
     } folha;
   } conteudo;
 } TipoPaginaEstrela;
 
 void inicializarAB(TipoApontadorEstrela *raiz);
 void InserirAB(TipoRegistro registro, TipoApontadorEstrela *raiz);
-bool pesquisarNaArvoreBEstrela(TipoRegistro *registro,
-                               TipoApontadorEstrela pagina);
+int pesquisarNaArvoreBEstrela(TipoRegistro *registro, TipoApontadorEstrela pagina);
 void liberarAB(TipoApontadorEstrela *raiz);
 
 #endif
