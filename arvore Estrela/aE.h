@@ -2,8 +2,8 @@
 #define ABESTRELA_H
 #include "../registro.h"
 #include <stdbool.h>
-#define MAX_CHAVES_INTERNA 4    /* maximo de chaves em uma pagina interna */
-#define MAX_REGISTROS_FOLHA 4   /* maximo de registros em uma pagina folha */
+#define MAX_CHAVES_INTERNA 100   /* maximo de chaves em uma pagina interna */
+#define MAX_REGISTROS_FOLHA 100  /* maximo de registros em uma pagina folha */
 
 typedef enum { PaginaInterna, PaginaFolha } TipoCategoriaPagina;
 

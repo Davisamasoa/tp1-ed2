@@ -9,8 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* quantidade de chaves pesquisadas no modo de experimento (-E) */
-#define NUM_CHAVES_EXPERIMENTO 20
 
 /* Tudo o que o indice de cada metodo precisa manter em memoria interna */
 typedef struct {
@@ -196,80 +194,9 @@ static int executarUmaChave(Contexto *ctx, char *nomeArquivo, char *nomeArvore,
   return 1;
 }
 
-/* Modo experimento (-E): cria o indice UMA vez e pesquisa 20 chaves bem
-   espalhadas (ver abaixo), calculando a media de cada quesito.
-   Ultima linha da saida: registro CSV para o script de analise. */
-static int executarExperimento(Contexto *ctx, char *nomeArquivo,
-                               char *nomeArvore, long quantidade,
-                               long situacao) {
-  Metricas criacao;
-  TipoRegistro registro;
-  int chaves[NUM_CHAVES_EXPERIMENTO];
-
-  if (quantidade < NUM_CHAVES_EXPERIMENTO) {
-    printf("Erro: o modo -E exige pelo menos %d registros.\n",
-           NUM_CHAVES_EXPERIMENTO);
-    return 0;
-  }
-  /* O gerador cria as chaves 1..n (em qualquer ordem), logo todas as chaves
-     abaixo existem no arquivo. Sao 20 chaves igualmente espacadas de 1 ate n. */
-  for (int i = 0; i < NUM_CHAVES_EXPERIMENTO; i++)
-    chaves[i] = (int)(1 + (long)i * (quantidade - 1) / (NUM_CHAVES_EXPERIMENTO - 1));
-
-  /* ---- CRIACAO DO INDICE (cronometrada, uma vez) ---- */
-  metricas = (Metricas){0, 0, 0.0};
-  double inicio = agora();
-  int ok = criarIndice(ctx, nomeArquivo, nomeArvore);
-  double fim = agora();
-  criacao = metricas;
-  criacao.tempo = fim - inicio;
-  if (!ok) {
-    printf("Erro ao criar o indice do metodo %d.\n", ctx->metodo);
-    return 0;
-  }
-
-  /* ---- 20 PESQUISAS (cada uma medida separadamente) ---- */
-  long somaTransf = 0, somaComp = 0;
-  double somaTempo = 0.0;
-  int naoEncontradas = 0;
-  for (int i = 0; i < NUM_CHAVES_EXPERIMENTO; i++) {
-    metricas = (Metricas){0, 0, 0.0};
-    inicio = agora();
-    int achou = buscar(ctx, chaves[i], &registro);
-    fim = agora();
-    somaTransf += metricas.transferencias;
-    somaComp += metricas.comparacoes;
-    somaTempo += fim - inicio;
-    if (!achou)
-      naoEncontradas++;
-  }
-
-  double mediaTransf = (double)somaTransf / NUM_CHAVES_EXPERIMENTO;
-  double mediaComp = (double)somaComp / NUM_CHAVES_EXPERIMENTO;
-  double mediaTempo = somaTempo / NUM_CHAVES_EXPERIMENTO;
-
-  printf("Experimento: metodo %d, %ld registros, situacao %ld, %d chaves\n",
-         ctx->metodo, quantidade, situacao, NUM_CHAVES_EXPERIMENTO);
-  if (naoEncontradas > 0)
-    printf("ATENCAO: %d chave(s) nao foram encontradas!\n", naoEncontradas);
-  imprimirMetricas("Criacao do indice", criacao);
-  printf("--- Pesquisa (media de %d chaves) ---\n", NUM_CHAVES_EXPERIMENTO);
-  printf("Transferencias (leituras): %.2f\n", mediaTransf);
-  printf("Comparacoes entre chaves : %.2f\n", mediaComp);
-  printf("Tempo de execucao        : %.9f s\n", mediaTempo);
-  /* metodo;quantidade;situacao;cria_transf;cria_comp;cria_tempo;
-     pesq_transf;pesq_comp;pesq_tempo;nao_encontradas */
-  printf("CSV;%d;%ld;%ld;%ld;%ld;%.9f;%.4f;%.4f;%.9f;%d\n", ctx->metodo,
-         quantidade, situacao, criacao.transferencias, criacao.comparacoes,
-         criacao.tempo, mediaTransf, mediaComp, mediaTempo, naoEncontradas);
-  return 1;
-}
-
-/* ---------------------------------------------------------------------- */
-
 int main(int argc, char *argv[]) {
   long metodo, quantidade, situacao, chave = 0;
-  int modoExperimento = 0, mostrarChaves = 0;
+  int mostrarChaves = 0;
 
   if (argc < 5 || argc > 6) {
     printf("Uso: %s <metodo> <quantidade> <situacao> <chave> [-P]\n", argv[0]);
@@ -278,7 +205,6 @@ int main(int argc, char *argv[]) {
            "              3 (arvore B), 4 (arvore B*)\n");
     printf("  situacao  : 1 (ascendente), 2 (descendente), 3 (aleatorio)\n");
     printf("  -P        : imprime as chaves do arquivo\n");
-    printf("  -E        : experimento automatico com 20 chaves (medias)\n");
     return 1;
   }
   if (!lerInteiro(argv[1], &metodo) || metodo < 1 || metodo > 4) {
@@ -293,13 +219,8 @@ int main(int argc, char *argv[]) {
     printf("Erro: situacao invalida. Deve ser 1, 2 ou 3.\n");
     return 1;
   }
-  if (strcmp(argv[4], "-E") == 0) {
-    modoExperimento = 1;
-  } else if (!lerInteiro(argv[4], &chave)) {
-    printf("Erro: chave invalida '%s' (use um inteiro ou -E).\n", argv[4]);
-    return 1;
-  }
-  if (argc == 6) {
+ 
+  if (argc == 5) {
     if (strcmp(argv[5], "-P") != 0) {
       printf("Erro: argumento opcional invalido '%s' (use -P).\n", argv[5]);
       return 1;
@@ -342,11 +263,8 @@ int main(int argc, char *argv[]) {
   ctx.metodo = (int)metodo;
 
   int ok;
-  if (modoExperimento)
-    ok = executarExperimento(&ctx, nomeArquivo, nomeArvore, quantidade,
-                             situacao);
-  else
-    ok = executarUmaChave(&ctx, nomeArquivo, nomeArvore, (int)chave);
+ 
+  ok = executarUmaChave(&ctx, nomeArquivo, nomeArvore, (int)chave);
 
   liberarIndice(&ctx);
   return ok ? 0 : 1;
