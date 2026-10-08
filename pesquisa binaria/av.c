@@ -31,7 +31,7 @@ int construirArvoreBinaria(char *gerador, char *nomeArquivoArvore) {
       long posAtual = 0; // começa a procura pela raiz
       int inserido = 0;
 
-      while (!inserido) {
+      do {
         // lê o nodo atual para comparar a chave
         fseek(arvore, posAtual * sizeof(Nodo), SEEK_SET);
         fread(&atual, sizeof(Nodo), 1, arvore);
@@ -77,7 +77,7 @@ int construirArvoreBinaria(char *gerador, char *nomeArquivoArvore) {
         } else {
           return 0;
         }
-      }
+      } while (!inserido);
     }
   }
 
