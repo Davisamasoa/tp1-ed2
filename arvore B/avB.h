@@ -1,7 +1,7 @@
 #ifndef AVB_H
 #define AVB_H
 #include "../registro.h"
-#define ORDEM 2
+#define ORDEM 100
 #define MAX_REGISTROS (2 * ORDEM)
 #define TRUE 1
 #define FALSE 0

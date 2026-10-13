@@ -12,7 +12,7 @@ void inserirNaArvoreB(TipoRegistro registro, TipoApontador *raiz) {
   TipoPagina *filhoPromovido, *novaRaiz;
   inserirRecursivo(registro, *raiz, &cresceu, &registroPromovido,
                    &filhoPromovido);
-  if (cresceu) /* Arvore cresce na altura pela raiz */
+  if (cresceu) // Arvore cresce na altura pela raiz 
   {
     novaRaiz = (TipoPagina *)malloc(sizeof(TipoPagina));
     novaRaiz->quantidade = 1;
