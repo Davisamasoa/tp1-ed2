@@ -1,0 +1,760 @@
+\documentclass{article}
+
+\input{setup}
+\usepackage{pgfplots} % remova se o setup.tex ja carregar o pgfplots
+\pgfplotsset{compat=1.17}
+
+\begin{document}
+
+\CAPA{Trabalho Prático I: Pesquisa Externa}{BCC203 - Estrutura de Dados II}{Davi Samuel Machado Soares, Luisa Rafaela Silva Reis, Roberta Teixeira do Nascimento e Luiza Oliveira Fonseca}{Guilherme Tavares de Assis}
+
+
+\section{Introdução}
+
+Este trabalho compara o desempenho de quatro métodos de pesquisa externa: (1) acesso sequencial indexado, (2) árvore binária de pesquisa em memória externa, (3) árvore B e (4) árvore B*. Para cada método são medidos, separadamente para a \emph{criação do índice} e para a \emph{pesquisa}, o número de transferências de itens da memória externa para a interna, o número de comparações entre chaves e o tempo de execução.
+
+Para este trabalho é necessário entregar o código em C e um relatório referente ao que foi desenvolvido. Os algoritmos desenvolvidos são os quatro métodos de pesquisa externa citados acima, baseados em \cite{ziviani}. As árvores B e B* seguem a definição original de \cite{bayer1972}, revisada em \cite{comer1979}, e as análises de custo usam como referência \cite{knuth1998} e \cite{cormen2009}.
+
+A codificação foi feita em C, usando somente a biblioteca padrão e funções POSIX (\texttt{clock\_gettime}, \texttt{fsync} e \texttt{posix\_fadvise}), sem bibliotecas adicionais.
+
+\subsection{Especificações do problema}
+
+Os registros ficam em um arquivo binário e cada um tem três campos: \texttt{chave} (\texttt{int}), \texttt{dado1} (\texttt{long}) e \texttt{dado2} (\texttt{char[5000]}), o que dá 5.016 bytes por registro (Código~\ref{lst:registro}).
+
+\begin{lstlisting}[caption={Definição do registro (registro.h).},label={lst:registro},language=C]
+typedef struct {
+  int chave;
+  long dado1;
+  char dado2[5000];
+} TipoRegistro;
+\end{lstlisting}
+
+O programa trabalha com arquivos de 100, 200, 2.000, 20.000, 200.000 e 2.000.000 de registros em três situações de ordem (ascendente, descendente e aleatória), construir o índice do método escolhido e pesquisar uma chave. A saída informa se a chave foi encontrada, mostra o registro completo e as três métricas de criação e de pesquisa.
+
+\subsection{Considerações iniciais}
+
+Algumas ferramentas foram utilizadas durante a criação deste projeto:
+
+\begin{itemize}
+  \item Ambiente de desenvolvimento do código fonte: ????. % PREENCHER
+  \item Linguagem utilizada: C.
+  \item Compilador: \texttt{gcc}, automatizado por \texttt{Makefile}.
+  \item Ambiente de desenvolvimento da documentação: Overleaf \LaTeX. \footnote{Disponível em \url{https://www.overleaf.com/}}
+\end{itemize}
+
+\subsection{Ferramentas utilizadas}
+Algumas ferramentas foram utilizadas para testar a implementação, como:
+\begin{itemize}
+    \item[-] Script de shell que executa o programa para todas as combinações de método, quantidade e situação, uma vez para cada uma das 20 chaves pesquisadas, e calcula as médias.
+    \item[-] \textit{/usr/bin/time -l}: medição do pico de memória (RAM) usado pelo processo.
+\end{itemize}
+
+\subsection{Especificações da máquina}
+\label{sec:maquina}
+A máquina onde o desenvolvimento e os testes foram realizados possui a seguinte configuração:
+\begin{itemize}
+    \item[-] Processador: Apple M4 (10 núcleos).
+    \item[-] Memória RAM: 16 GB.
+    \item[-] Sistema Operacional: macOS.
+\end{itemize}
+
+\subsection{Instruções de compilação e execução}
+
+Para a compilação do projeto, basta digitar:
+
+\begin{tcolorbox}[title=Compilando o projeto,width=\linewidth]
+    \texttt{make TARGET=pesquisa}
+\end{tcolorbox}
+
+O \texttt{Makefile} compila cada módulo (\texttt{main.c}, \texttt{metricas.c}, \texttt{asi.c}, \texttt{gerador.c}, \texttt{pB.c}, \texttt{avB.c} e \texttt{aE.c}) com as seguintes opções:
+\begin{itemize}
+    \item [-] \emph{-std=c11}: padrão da linguagem C usado no projeto.
+    \item [-] \emph{-Wall -Wextra}: para mostrar todos os possíveis \emph{warnings} do código.
+    \item [-] \emph{-O2}: otimização do código gerado, já que o objetivo é medir desempenho.
+\end{itemize}
+
+Para a execução do programa basta digitar:
+\begin{tcolorbox}[title=Executando o programa,width=\linewidth]
+    \texttt{./pesquisa \textless metodo\textgreater{} \textless quantidade\textgreater{} \textless situacao\textgreater{} \textless chave\textgreater{} [-P]}
+\end{tcolorbox}
+
+Onde:
+\begin{itemize}
+    \item [-] \texttt{metodo}: 1 (acesso sequencial indexado), 2 (árvore binária), 3 (árvore B) ou 4 (árvore B*);
+    \item [-] \texttt{quantidade}: número de registros do arquivo;
+    \item [-] \texttt{situacao}: 1 (ascendente), 2 (descendente) ou 3 (aleatória);
+    \item [-] \texttt{chave}: chave a ser pesquisada;
+    \item [-] \texttt{-P} (opcional): imprime as chaves do arquivo antes da pesquisa, fora de qualquer medição.
+\end{itemize}
+
+Argumentos inválidos, método 1 com arquivo não ascendente, falta de memória e erros de arquivo geram mensagens de erro específicas.
+
+\clearpage
+\section{Desenvolvimento}
+
+O projeto foi organizado em um diretório por método, com um módulo de métricas compartilhado (Tabela~\ref{tab:arquivos}).
+
+\begin{table}[!htb]
+    \centering
+    \begin{tabular}{|l|l|}
+        \hline\hline
+        Arquivo & Responsabilidade \\\hline
+        \texttt{main.c} & Linha de comando, criação do índice, pesquisa e medições \\
+        \texttt{metricas.c/h} & Contadores de transferências e comparações, relógio \\
+        \texttt{acesso sequencial indexado/asi.c} & Método 1 \\
+        \texttt{pesquisa binaria/pB.c} & Método 2 \\
+        \texttt{arvore B/avB.c} & Método 3 \\
+        \texttt{arvore Estrela/aE.c} & Método 4 \\\hline\hline
+    \end{tabular}
+    \caption{\label{tab:arquivos}Organização dos arquivos do projeto.}
+\end{table}
+
+\subsection{Contagem das métricas}
+
+\begin{itemize}
+    \item \textbf{Transferências}: cada registro ou nodo lido da memória externa com \texttt{fread} incrementa um contador global (\texttt{metricas.transferencias}).
+    \item \textbf{Comparações}: toda comparação entre chaves passa pela macro \texttt{COMP}, que incrementa o contador e avalia a expressão. Assim a contagem é uniforme entre os métodos.
+    \item \textbf{Tempo}: \texttt{clock\_gettime(CLOCK\_MONOTONIC)}, com resolução de nanossegundos. A impressão de resultados não entra no tempo.
+\end{itemize}
+
+\begin{lstlisting}[caption={Estrutura de métricas e macro de contagem (metricas.h).},label={lst:metricas},language=C]
+typedef struct {
+  long transferencias; /* registros/nodos lidos da memoria externa */
+  long comparacoes;    /* comparacoes entre chaves de pesquisa */
+  double tempo;        /* segundos */
+} Metricas;
+
+extern Metricas metricas;
+
+/* avalia a expressao de comparacao de chaves contando-a */
+#define COMP(expr) (metricas.comparacoes++, (expr))
+\end{lstlisting}
+
+O \texttt{main.c} zera os contadores antes de cada fase, cronometra a função inteira de criação do índice (\texttt{criarIndice}) e depois a pesquisa (\texttt{buscar}), guardando as métricas de cada fase separadamente (Código~\ref{lst:medicao}).
+
+\begin{lstlisting}[caption={Medição das duas fases (main.c).},label={lst:medicao},language=C]
+  /* ---- CRIACAO DO INDICE (cronometrada) ---- */
+  metricas = (Metricas){0, 0, 0.0};
+  double inicio = agora();
+  int ok = criarIndice(ctx, nomeArquivo, nomeArvore);
+  double fim = agora();
+  criacao = metricas;
+  criacao.tempo = fim - inicio;
+
+  /* ---- PESQUISA (cronometrada) ---- */
+  metricas = (Metricas){0, 0, 0.0};
+  inicio = agora();
+  int achou = buscar(ctx, chave, &registro);
+  fim = agora();
+  pesquisa = metricas;
+  pesquisa.tempo = fim - inicio;
+\end{lstlisting}
+
+\subsection{Método 1 -- Acesso sequencial indexado}
+
+O arquivo é dividido em páginas de 100 registros (\texttt{ITENS\_POR\_PAGINA}); a tabela de índice guarda, para cada página, seu número e sua primeira chave (até 20.000 páginas, ou seja, 2.000.000 de registros).
+
+\begin{itemize}
+    \item \textbf{Criação}: lê o primeiro registro de cada página e salta os outros 99 com \texttt{fseek} (Código~\ref{lst:asi-criar}).
+    \item \textbf{Pesquisa}: percorre a tabela sequencialmente até achar a página candidata, lê a página inteira (a última pode estar incompleta) e faz pesquisa sequencial nela (Código~\ref{lst:asi-pesq}).
+    \item Só se aplica ao arquivo ascendente; nas situações 2 e 3 o programa recusa a execução com mensagem de erro.
+\end{itemize}
+
+\begin{lstlisting}[caption={Criação da tabela de índice (asi.c).},label={lst:asi-criar},language=C]
+int criarIndiceASI(FILE *arquivo, TipoIndice indice[], int *quantidadePaginas) {
+  TipoRegistro registro;
+  *quantidadePaginas = 0;
+  while (fread(&registro, sizeof(registro), 1, arquivo) == 1) {
+    metricas.transferencias++; /* 1 registro lido (o 1o de cada pagina) */
+    if (*quantidadePaginas >= MAX_PAGINAS) {
+      printf("Erro: arquivo possui mais paginas do que o suportado "
+             "(MAX_PAGINAS = %d)\n", MAX_PAGINAS);
+      return 0;
+    }
+    indice[*quantidadePaginas].primeiraChave = registro.chave;
+    indice[*quantidadePaginas].numeroPagina = *quantidadePaginas + 1;
+    (*quantidadePaginas)++;
+    /* pula o restante da pagina */
+    fseek(arquivo, sizeof(registro) * (ITENS_POR_PAGINA - 1), SEEK_CUR);
+  }
+  return 1;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Pesquisa no acesso sequencial indexado (asi.c).},label={lst:asi-pesq},language=C]
+int pesquisarRegistro(TipoIndice indice[], int quantidadePaginas,
+                      TipoRegistro *registro, FILE *arquivo) {
+  TipoRegistro pagina[ITENS_POR_PAGINA];
+  int paginaAlvo, itensNaPagina;
+  long deslocamento;
+  /* procura pela pagina onde o registro pode se encontrar */
+  paginaAlvo = 0;
+  while (paginaAlvo < quantidadePaginas &&
+         COMP(indice[paginaAlvo].primeiraChave <= registro->chave))
+    paginaAlvo++;
+  if (paginaAlvo == 0)
+    return 0;
+  else { /* a ultima pagina pode nao estar completa */
+    if (paginaAlvo < quantidadePaginas)
+      itensNaPagina = ITENS_POR_PAGINA;
+    else {
+      fseek(arquivo, 0, SEEK_END);
+      int itensRestantes =
+          (ftell(arquivo) / sizeof(TipoRegistro)) % ITENS_POR_PAGINA;
+      itensNaPagina = itensRestantes == 0 ? ITENS_POR_PAGINA : itensRestantes;
+    }
+    /* le a pagina desejada do arquivo */
+    deslocamento = (indice[paginaAlvo - 1].numeroPagina - 1) *
+                   ITENS_POR_PAGINA * sizeof(TipoRegistro);
+    fseek(arquivo, deslocamento, SEEK_SET);
+    size_t lidos = fread(&pagina, sizeof(TipoRegistro), itensNaPagina, arquivo);
+    metricas.transferencias += (long)lidos;
+    /* pesquisa sequencial na pagina lida */
+    for (size_t i = 0; i < lidos; i++)
+      if (COMP(pagina[i].chave == registro->chave)) {
+        *registro = pagina[i];
+        return 1;
+      }
+    return 0;
+  }
+}
+\end{lstlisting}
+
+\subsection{Método 2 -- Árvore binária de pesquisa em memória externa}
+
+A árvore fica inteira em disco, no arquivo \texttt{arvorebinaria\_\textit{q}\_\textit{s}.bin}. Cada nodo guarda o registro completo e as posições (índice no arquivo) dos filhos esquerdo e direito, com $-1$ indicando filho vazio (Código~\ref{lst:nodo}).
+
+\begin{lstlisting}[caption={Nodo da árvore binária externa (pB.h).},label={lst:nodo},language=C]
+typedef struct {
+    long esquerda;
+    TipoRegistro registro;
+    long direita;
+} Nodo;
+\end{lstlisting}
+
+\begin{itemize}
+    \item \textbf{Criação}: cada registro do arquivo de dados é lido (1 transferência) e inserido descendo a partir da raiz; cada nodo visitado é lido do arquivo da árvore (1 transferência). O novo nodo é gravado no fim do arquivo e o ponteiro do pai é atualizado no lugar (Código~\ref{lst:pb-ins}).
+    \item \textbf{Pesquisa}: desce a partir da raiz lendo um nodo por vez do arquivo, até achar a chave ou chegar a um filho vazio (Código~\ref{lst:pb-pesq}).
+    \item É o único método em que tanto a criação quanto a pesquisa usam somente memória externa.
+\end{itemize}
+
+\begin{lstlisting}[caption={Inserção de um nodo à esquerda (trecho de construirArvoreBinaria, pB.c). O caso da direita é simétrico.},label={lst:pb-ins},language=C]
+  fseek(arquivoArvore, posAtual * sizeof(Nodo), SEEK_SET);
+  fread(&nodoAtual, sizeof(Nodo), 1, arquivoArvore);
+  metricas.transferencias++; /* nodo lido da arvore (memoria externa) */
+
+  if (COMP(registroLido.chave < nodoAtual.registro.chave)) {
+    if (nodoAtual.esquerda == -1) {
+      /* atualiza o ponteiro esquerdo do pai */
+      nodoAtual.esquerda = posNovoNodo;
+      fseek(arquivoArvore, posAtual * sizeof(Nodo), SEEK_SET);
+      fwrite(&nodoAtual, sizeof(Nodo), 1, arquivoArvore);
+      /* grava o novo nodo no final do arquivo */
+      fseek(arquivoArvore, 0, SEEK_END);
+      fwrite(&novoNodo, sizeof(Nodo), 1, arquivoArvore);
+      inserido = 1;
+      totalNodos++;
+    } else {
+      posAtual = nodoAtual.esquerda;
+    }
+  }
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Pesquisa na árvore binária externa (pB.c).},label={lst:pb-pesq},language=C]
+int pesquisarNaArvoreBinaria(FILE *arquivoArvore, int chaveBuscada,
+                             TipoRegistro *registro) {
+  long posAtual = 0; /* comeca da raiz */
+  Nodo nodoAtual;
+  while (posAtual != -1) {
+    fseek(arquivoArvore, posAtual * sizeof(Nodo), SEEK_SET);
+    if (fread(&nodoAtual, sizeof(Nodo), 1, arquivoArvore) != 1)
+      return 0;
+    metricas.transferencias++;
+    if (COMP(chaveBuscada == nodoAtual.registro.chave)) {
+      *registro = nodoAtual.registro;
+      return 1;
+    } else if (COMP(chaveBuscada < nodoAtual.registro.chave)) {
+      posAtual = nodoAtual.esquerda;
+    } else {
+      posAtual = nodoAtual.direita;
+    }
+  }
+  return 0;
+}
+\end{lstlisting}
+
+\subsection{Método 3 -- Árvore B}
+
+Árvore B de ordem 100 (\texttt{ORDEM}), com até 200 registros e 201 filhos por página, mantida inteiramente em memória principal (Código~\ref{lst:avb-pag}). Pela definição de \cite{bayer1972}, toda página exceto a raiz tem entre \texttt{ORDEM} e $2\cdot$\texttt{ORDEM} registros, o que garante altura máxima de $\log_{\texttt{ORDEM}+1}((n+1)/2)$ \cite{cormen2009}.
+
+\begin{itemize}
+    \item \textbf{Criação}: cada registro do arquivo é lido uma vez (1 transferência) e inserido recursivamente; a busca da posição na página é sequencial e, em caso de overflow, a página é dividida e o registro do meio sobe para o pai. A árvore cresce pela raiz (Código~\ref{lst:avb-ins}).
+    \item \textbf{Pesquisa}: desce a partir da raiz fazendo pesquisa binária dentro de cada página (Código~\ref{lst:avb-pesq}).
+    \item Como as páginas guardam os registros completos, a pesquisa não lê nada do disco: as transferências de pesquisa são 0.
+\end{itemize}
+
+\begin{lstlisting}[caption={Página da árvore B (avB.h).},label={lst:avb-pag},language=C]
+#define ORDEM 100
+#define MAX_REGISTROS (2 * ORDEM)
+
+typedef struct TipoPagina *TipoApontador;
+typedef struct TipoPagina {
+  short quantidade;
+  TipoRegistro registros[MAX_REGISTROS];
+  TipoApontador filhos[MAX_REGISTROS + 1];
+} TipoPagina;
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Inserção recursiva com divisão de página (avB.c).},label={lst:avb-ins},language=C]
+void inserirRecursivo(TipoRegistro registro, TipoApontador pagina,
+                      short *cresceu, TipoRegistro *registroPromovido,
+                      TipoApontador *filhoPromovido) {
+  long posicao = 1;
+  long j;
+  TipoApontador novaPagina;
+  //caso base: chegou no fundo da arvore
+  if (pagina == NULL) {
+    *cresceu = TRUE;
+    (*registroPromovido) = registro;
+    (*filhoPromovido) = NULL;
+    return;
+  }
+  //procura por qual dos filhos descer na arvore
+  while (posicao < pagina->quantidade &&
+         COMP(registro.chave > pagina->registros[posicao - 1].chave))
+    posicao++;
+  //impede que chaves duplicadas sejam inseridas
+  if (COMP(registro.chave == pagina->registros[posicao - 1].chave)) {
+    printf("Erro: Registro ja esta presente\n");
+    *cresceu = FALSE;
+    return;
+  }
+  if (COMP(registro.chave < pagina->registros[posicao - 1].chave))
+    posicao--;
+  inserirRecursivo(registro, pagina->filhos[posicao], cresceu,
+                   registroPromovido, filhoPromovido);
+  if (!*cresceu)
+    return;
+  //se a pagina atual tem espaco, apenas insere a chave e encerra
+  if (pagina->quantidade < MAX_REGISTROS) {
+    inserirNaPagina(pagina, *registroPromovido, *filhoPromovido);
+    *cresceu = FALSE;
+    return;
+  }
+  //overflow: a pagina tem que ser dividida
+  novaPagina = (TipoApontador)malloc(sizeof(TipoPagina));
+  novaPagina->quantidade = 0;
+  novaPagina->filhos[0] = NULL;
+  //decide se a chave fica na pagina antiga ou na nova
+  if (posicao < ORDEM + 1) {
+    inserirNaPagina(novaPagina, pagina->registros[MAX_REGISTROS - 1],
+                    pagina->filhos[MAX_REGISTROS]);
+    pagina->quantidade--;
+    inserirNaPagina(pagina, *registroPromovido, *filhoPromovido);
+  } else
+    inserirNaPagina(novaPagina, *registroPromovido, *filhoPromovido);
+  //transfere a segunda metade da pagina antiga para a nova
+  for (j = ORDEM + 2; j <= MAX_REGISTROS; j++)
+    inserirNaPagina(novaPagina, pagina->registros[j - 1], pagina->filhos[j]);
+  pagina->quantidade = ORDEM;
+  novaPagina->filhos[0] = pagina->filhos[ORDEM + 1];
+  //o elemento do meio sobe para o pai
+  *registroPromovido = pagina->registros[ORDEM];
+  *filhoPromovido = novaPagina;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Pesquisa na árvore B com busca binária na página (avB.c).},label={lst:avb-pesq},language=C]
+int pesquisarNaArvoreB(TipoRegistro *registro, TipoApontador pagina) {
+  while (pagina != NULL) {
+    int esq = 0, dir = pagina->quantidade - 1, meio;
+    while (esq <= dir) {
+      meio = esq + (dir - esq) / 2;
+      if (COMP(registro->chave == pagina->registros[meio].chave)) {
+        *registro = pagina->registros[meio];
+        return 1;
+      }
+      if (COMP(registro->chave < pagina->registros[meio].chave))
+        dir = meio - 1;
+      else
+        esq = meio + 1;
+    }
+    //se nao encontrou, esq aponta para o ponteiro do filho correto
+    pagina = pagina->filhos[esq];
+  }
+  return 0;
+}
+\end{lstlisting}
+
+\subsection{Método 4 -- Árvore B*}
+
+Os registros ficam apenas nas folhas (até 100 por folha, \texttt{MAX\_REGISTROS\_FOLHA}), encadeadas pelo ponteiro \texttt{proximo}; as páginas internas guardam só chaves (até 100, \texttt{MAX\_CHAVES\_INTERNA}) e 101 filhos. A árvore inteira fica em memória principal. Essa organização, com os dados só nas folhas e as páginas internas funcionando como índice, é a variante descrita por \cite{comer1979} e \cite{knuth1998}, chamada de árvore B* em \cite{ziviani}.
+
+A página é um registro variante (\texttt{union}), mostrado no Código~\ref{lst:ae-pag}. As páginas internas são alocadas só com o tamanho da parte interna (cerca de 1,2 KB, em vez dos 490 KB de uma folha), o que reduz bastante o uso de memória.
+
+\begin{lstlisting}[caption={Página da árvore B* (aE.h).},label={lst:ae-pag},language=C]
+typedef enum { PaginaInterna, PaginaFolha } TipoCategoriaPagina;
+
+typedef struct TipoPaginaEstrela *TipoApontadorEstrela;
+typedef struct TipoPaginaEstrela {
+  TipoCategoriaPagina tipo;
+  union {
+    struct {
+      int quantidadeChaves;
+      int chaves[MAX_CHAVES_INTERNA];
+      TipoApontadorEstrela filhos[MAX_CHAVES_INTERNA + 1];
+    } interna;
+    struct {
+      int quantidadeRegistros;
+      TipoRegistro registros[MAX_REGISTROS_FOLHA];
+      TipoApontadorEstrela proximo; //encadeamento das folhas
+    } folha;
+  } conteudo;
+} TipoPaginaEstrela;
+\end{lstlisting}
+
+\begin{itemize}
+    \item \textbf{Criação}: cada registro do arquivo é lido uma vez e inserido na folha correta. Uma folha cheia é dividida ao meio e a primeira chave da nova folha sobe como separadora. Uma página interna cheia junta as 101 chaves num vetor temporário, divide ao meio e promove a chave central (Código~\ref{lst:ae-div}).
+    \item \textbf{Pesquisa}: pesquisa sequencial nas páginas internas até chegar a uma folha e pesquisa sequencial na folha (Código~\ref{lst:ae-pesq}). Assim como na árvore B, não há leitura de disco na pesquisa.
+\end{itemize}
+
+\begin{lstlisting}[caption={Divisão de página interna cheia (trecho de inserirRecursivo, aE.c).},label={lst:ae-div},language=C]
+    int chaves[MAX_CHAVES_INTERNA + 1];
+    TipoApontadorEstrela filhos[MAX_CHAVES_INTERNA + 2];
+    int total = MAX_CHAVES_INTERNA + 1;
+    filhos[0] = pagina->conteudo.interna.filhos[0];
+    for (j = 0; j < MAX_CHAVES_INTERNA; j++) {
+      chaves[j] = pagina->conteudo.interna.chaves[j];
+      filhos[j + 1] = pagina->conteudo.interna.filhos[j + 1];
+    }
+    j = MAX_CHAVES_INTERNA;
+    while (j > 0 && COMP(*chavePromovida < chaves[j - 1])) {
+      chaves[j] = chaves[j - 1];
+      filhos[j + 1] = filhos[j];
+      j--;
+    }
+    chaves[j] = *chavePromovida;
+    filhos[j + 1] = *filhoPromovido;
+
+    int meio = total / 2;
+    novaPagina = malloc(offsetof(TipoPaginaEstrela, conteudo) +
+                 sizeof(((TipoPaginaEstrela *)0)->conteudo.interna));
+    novaPagina->tipo = PaginaInterna;
+
+    pagina->conteudo.interna.quantidadeChaves = meio;
+    for (j = 0; j < meio; j++) {
+      pagina->conteudo.interna.chaves[j] = chaves[j];
+      pagina->conteudo.interna.filhos[j + 1] = filhos[j + 1];
+    }
+    novaPagina->conteudo.interna.filhos[0] = filhos[meio + 1];
+    for (j = meio + 1; j < total; j++) {
+      novaPagina->conteudo.interna.chaves[j - meio - 1] = chaves[j];
+      novaPagina->conteudo.interna.filhos[j - meio] = filhos[j + 1];
+    }
+    novaPagina->conteudo.interna.quantidadeChaves = total - meio - 1;
+
+    *chavePromovida = chaves[meio];
+    *filhoPromovido = novaPagina;
+    *cresceu = true;
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Pesquisa na árvore B* (aE.c).},label={lst:ae-pesq},language=C]
+int pesquisarNaArvoreBEstrela(TipoRegistro *registro,
+                              TipoApontadorEstrela pagina) {
+  int posicao;
+  if (pagina == NULL)
+    return 0;
+  if (pagina->tipo == PaginaInterna) {
+    posicao = 1;
+    while (posicao < pagina->conteudo.interna.quantidadeChaves &&
+           COMP(registro->chave > pagina->conteudo.interna.chaves[posicao - 1]))
+      posicao++;
+    if (COMP(registro->chave < pagina->conteudo.interna.chaves[posicao - 1]))
+      return pesquisarNaArvoreBEstrela(
+          registro, pagina->conteudo.interna.filhos[posicao - 1]);
+    return pesquisarNaArvoreBEstrela(registro,
+                                     pagina->conteudo.interna.filhos[posicao]);
+  }
+  posicao = 1;
+  while (posicao < pagina->conteudo.folha.quantidadeRegistros &&
+         COMP(registro->chave > pagina->conteudo.folha.registros[posicao - 1].chave))
+    posicao++;
+  if (pagina->conteudo.folha.quantidadeRegistros > 0 &&
+      COMP(registro->chave == pagina->conteudo.folha.registros[posicao - 1].chave)) {
+    *registro = pagina->conteudo.folha.registros[posicao - 1];
+    return 1;
+  }
+  return 0;
+}
+\end{lstlisting}
+
+\clearpage
+\section{Experimentos}
+
+Foram medidos, para a criação do índice e para a pesquisa, o número de transferências, o número de comparações entre chaves e o tempo de execução, na máquina descrita na Seção~\ref{sec:maquina} (Apple M4, 16 GB de RAM, macOS, \texttt{gcc -O2}). Também foi medido o pico de memória do processo com \texttt{/usr/bin/time -l}.
+
+\begin{itemize}
+    \item Quantidades: 100, 200, 2.000, 20.000, 200.000 e 2.000.000 registros, nas três situações de ordem.
+    \item Em cada combinação, o índice foi criado uma vez e foram pesquisadas 20 chaves distintas, igualmente espaçadas entre $1$ e $n$ (todas existentes), conforme o Código~\ref{lst:chaves}. As tabelas mostram as médias dessas 20 pesquisas; todas as chaves foram encontradas em todos os testes.
+    \item A execução foi automatizada por um script de shell que chama o programa uma vez para cada chave (Código~\ref{lst:chaves}), de modo que o índice é recriado a cada execução. As métricas de criação são as médias dessas 20 execuções; transferências e comparações de criação não variam entre elas, só o tempo.
+    \item Os métodos 3 e 4 foram medidos novamente depois que o tamanho das páginas passou para 100 (árvore B de ordem 100 e árvore B* com 100 itens por página). As medições dos métodos 1 e 2, cujo código não mudou, foram mantidas.
+\end{itemize}
+
+\begin{lstlisting}[caption={Escolha das 20 chaves do experimento (script de shell).},label={lst:chaves},language=sh]
+i=0
+while [ $i -lt 20 ]; do
+  k=$(( 1 + i * (q - 1) / 19 ))
+  ./pesquisa $m $q $s $k
+  i=$((i+1))
+done
+\end{lstlisting}
+
+\subsection{Limitações da bateria de testes}
+
+Algumas combinações não foram executadas por limite da máquina ou da própria implementação (Tabela~\ref{tab:limites}). Os dois motivos principais foram a falta de espaço (de memória principal e de disco) e o tempo de execução, que em alguns casos passaria de horas ou até dias.
+
+\begin{table}[!htb]
+    \centering
+    \small
+    \begin{tabular}{|p{0.32\linewidth}|p{0.6\linewidth}|}
+        \hline\hline
+        Combinação não executada & Motivo \\\hline
+        Método 1, situações 2 e 3 & O índice de páginas exige arquivo ordenado ascendentemente. \\\hline
+        Métodos 3 e 4 com 2.000.000 & Falta de espaço e tempo. As árvores guardam os registros completos em RAM: com 200.000 registros o pico foi de 1,0 a 1,9 GB, então com 2.000.000 seriam cerca de 10 a 19 GB, no limite ou acima dos 16 GB da máquina. Passando desse limite, o sistema usaria o disco como memória (\emph{swap}) e a criação ficaria muito lenta. Além disso, cada arquivo de 2.000.000 de registros ocupa cerca de 10 GB, ou seja, 30 GB só para as três situações. \\\hline
+        Método 2, situações 1 e 2, com 200.000 e 2.000.000 & A árvore degenera em lista e a construção faz cerca de $n^2/2$ leituras. Com 20.000 levou cerca de 160 s; por extrapolação, 200.000 levaria cerca de 4,5 horas e 2.000.000 cerca de 18 dias. \\\hline\hline
+    \end{tabular}
+    \caption{\label{tab:limites}Combinações não executadas.}
+\end{table}
+
+A função \texttt{limparCacheArquivo} usa \texttt{posix\_fadvise}, que não existe no macOS. Por isso, até 200.000 registros os arquivos (no máximo 1 GB) podem ter sido lidos do cache do sistema operacional. Com 2.000.000 (cerca de 10 GB por arquivo) as leituras chegam de fato ao disco, o que explica o salto de tempo nesse tamanho.
+
+\clearpage
+\section{Resultados}
+
+\subsection{Método 1 -- Acesso sequencial indexado}
+
+\begin{table}[!htb]
+    \centering
+    \small
+    \begin{tabular}{|r|r|r|r|r|r|r|}
+        \hline\hline
+        & \multicolumn{3}{c|}{Criação} & \multicolumn{3}{c|}{Pesquisa (média)} \\\hline
+        Registros & Transf. & Comp. & Tempo (ms) & Transf. & Comp. & Tempo ($\mu$s) \\\hline
+        100       & 1      & 0 & 0,100     & 100 & 51,05     & 82,2 \\
+        200       & 2      & 0 & 0,021     & 100 & 52,05     & 16,6 \\
+        2.000     & 20     & 0 & 0,064     & 100 & 61,50     & 25,0 \\
+        20.000    & 200    & 0 & 0,873     & 100 & 151,50    & 42,3 \\
+        200.000   & 2.000  & 0 & 3,640     & 100 & 1.051,50  & 35,4 \\
+        2.000.000 & 20.000 & 0 & 2.371,288 & 100 & 10.051,50 & 226,9 \\\hline\hline
+    \end{tabular}
+    \caption{\label{tab:m1}Método 1, situação ascendente.}
+\end{table}
+
+\begin{itemize}
+    \item \textbf{Criação -- transferências}: exatamente $n/100$ (uma leitura por página), crescimento linear com fator pequeno.
+    \item \textbf{Criação -- comparações}: zero, pois o índice só copia a primeira chave de cada página.
+    \item \textbf{Criação -- tempo}: abaixo de 4 ms até 200.000 registros. Em 2.000.000 o arquivo tem cerca de 10 GB e não cabe no cache do sistema, então cada salto exige leitura real do disco e o tempo sobe para 2,4 s.
+    \item \textbf{Pesquisa -- transferências}: constante e igual a 100 em todos os tamanhos, porque a página inteira é trazida para a memória.
+    \item \textbf{Pesquisa -- comparações}: em média $(n/100)/2$ na tabela mais cerca de 50 na página, ou seja, crescem linearmente: de 51 (100 registros) para 10.051 (2.000.000). Uma pesquisa binária na tabela reduziria esse termo para $\log_2(n/100)$.
+    \item \textbf{Pesquisa -- tempo}: dominado pela leitura de uma página de cerca de 500 KB, por isso fica entre 17 e 82 $\mu$s até 200.000; em 2.000.000 sobe para 227 $\mu$s porque a página tem de vir do disco. O valor de 100 registros (82 $\mu$s), maior que o de 200, reflete a variação natural de medições na casa dos microssegundos.
+\end{itemize}
+
+\subsection{Método 2 -- Árvore binária de pesquisa em memória externa}
+
+\begin{table}[!htb]
+    \centering
+    \footnotesize
+    \begin{tabular}{|r|l|r|r|r|r|r|r|}
+        \hline\hline
+        & & \multicolumn{3}{c|}{Criação} & \multicolumn{3}{c|}{Pesquisa (média)} \\\hline
+        Registros & Situação & Transf. & Comp. & Tempo (ms) & Transf. & Comp. & Tempo ($\mu$s) \\\hline
+        100       & Asc.  & 5.050       & 9.900       & 11,17      & 50,05     & 99,10     & 75,0 \\
+        100       & Desc. & 5.050       & 4.950       & 6,25       & 50,95     & 100,90    & 46,5 \\
+        100       & Aleat.& 811         & 975         & 1,63       & 8,70      & 16,40     & 13,2 \\\hline
+        200       & Asc.  & 20.100      & 39.800      & 14,78      & 100,05    & 199,10    & 68,7 \\
+        200       & Desc. & 20.100      & 19.900      & 14,68      & 100,95    & 200,90    & 69,5 \\
+        200       & Aleat.& 1.793       & 2.294       & 2,64       & 9,25      & 17,50     & 17,4 \\\hline
+        2.000     & Asc.  & 2.001.000   & 3.998.000   & 1.396,20   & 1.000,05  & 1.999,10  & 634,2 \\
+        2.000     & Desc. & 2.001.000   & 1.999.000   & 1.414,97   & 1.000,95  & 2.000,90  & 637,4 \\
+        2.000     & Aleat.& 26.070      & 37.152      & 33,18      & 12,80     & 24,60     & 56,2 \\\hline
+        20.000    & Asc.  & 200.010.000 & 399.980.000 & 159.494,68 & 10.000,05 & 19.999,10 & 7.417,2 \\
+        20.000    & Desc. & 200.010.000 & 199.990.000 & 163.856,85 & 10.000,95 & 20.000,90 & 7.509,4 \\
+        20.000    & Aleat.& 374.285     & 506.246     & 475,72     & 17,60     & 34,20     & 77,6 \\\hline
+        200.000   & Aleat.& 4.757.935   & 6.828.679   & 5.641,92   & 21,00     & 41,00     & 32,4 \\\hline
+        2.000.000 & Aleat.& 53.193.586  & 76.939.985  & 817.895,59 & 27,40     & 53,80     & 4.760,3 \\\hline\hline
+    \end{tabular}
+    \caption{\label{tab:m2}Método 2. Situações 1 e 2 com 200.000 e 2.000.000 não foram executadas (Tabela~\ref{tab:limites}).}
+\end{table}
+
+\begin{itemize}
+    \item \textbf{Criação -- transferências}: nos arquivos ordenados são exatamente $n(n+1)/2$ ($n$ leituras de dados mais $0 + 1 + \dots + (n-1)$ nodos visitados), crescimento quadrático: 5.050 para 100 registros e 200 milhões para 20.000. No aleatório são cerca de $n$ mais $n$ vezes a profundidade média; com 2.000.000 dá cerca de 26 nodos lidos por inserção, crescimento $O(n \log n)$.
+    \item \textbf{Criação -- comparações}: no ascendente são $n(n-1)$, o dobro do descendente ($n(n-1)/2$), porque descer à direita exige dois testes (menor que e maior que) e descer à esquerda só um. No aleatório crescem como $n \log n$ (cerca de 38 por registro com 2.000.000).
+    \item \textbf{Criação -- tempo}: acompanha as transferências. Nos ordenados passa de 1,4 s (2.000) para cerca de 160 s (20.000), ou seja, 100 vezes mais para 10 vezes mais registros. No aleatório fica em 5,6 s com 200.000, mas chega a 818 s (13,6 min) com 2.000.000, porque o arquivo da árvore (cerca de 10 GB) não cabe na RAM e cada visita a um nodo vira um acesso aleatório ao disco.
+    \item \textbf{Pesquisa -- transferências}: nos ordenados, cerca de $n/2$ em média (as 20 chaves cobrem a lista de ponta a ponta); no aleatório, logarítmicas: de 8,7 (100) para 27,4 (2.000.000), perto de $1{,}39 \log_2 n$, valor esperado para uma árvore binária aleatória \cite{knuth1998}.
+    \item \textbf{Pesquisa -- comparações}: cerca de duas por nodo visitado (igualdade e menor que), logo o dobro das transferências.
+    \item \textbf{Pesquisa -- tempo}: cada nodo lido é um \texttt{fseek} mais um \texttt{fread} de cerca de 5 KB. No aleatório fica abaixo de 80 $\mu$s até 200.000 e sobe para 4,8 ms com 2.000.000 (leituras reais de disco); nos ordenados chega a 7,5 ms com apenas 20.000 registros.
+\end{itemize}
+
+\subsection{Método 3 -- Árvore B}
+
+\begin{table}[!htb]
+    \centering
+    \small
+    \begin{tabular}{|r|l|r|r|r|r|r|}
+        \hline\hline
+        & & \multicolumn{3}{c|}{Criação} & \multicolumn{2}{c|}{Pesquisa (média)} \\\hline
+        Registros & Situação & Transf. & Comp. & Tempo (ms) & Comp. & Tempo ($\mu$s) \\\hline
+        100     & Asc.   & 100     & 5.148      & 0,163     & 10,40 & 0,25 \\
+        100     & Desc.  & 100     & 5.246      & 0,783     & 10,40 & 0,25 \\
+        100     & Aleat. & 100     & 5.330      & 0,386     & 10,40 & 0,30 \\\hline
+        200     & Asc.   & 200     & 20.298     & 0,237     & 13,00 & 0,10 \\
+        200     & Desc.  & 200     & 20.496     & 2,204     & 13,00 & 0,25 \\
+        200     & Aleat. & 200     & 20.677     & 1,296     & 13,00 & 0,25 \\\hline
+        2.000   & Asc.   & 2.000   & 315.442    & 3,405     & 20,00 & 0,55 \\
+        2.000   & Desc.  & 2.000   & 304.144    & 32,539    & 19,90 & 0,70 \\
+        2.000   & Aleat. & 2.000   & 297.673    & 17,342    & 18,80 & 0,40 \\\hline
+        20.000  & Asc.   & 20.000  & 5.038.905  & 36,578    & 26,40 & 1,80 \\
+        20.000  & Desc.  & 20.000  & 3.167.013  & 348,823   & 26,20 & 1,50 \\
+        20.000  & Aleat. & 20.000  & 3.726.010  & 215,815   & 25,60 & 0,90 \\\hline
+        200.000 & Asc.   & 200.000 & 61.680.903 & 411,788   & 33,00 & 4,50 \\
+        200.000 & Desc.  & 200.000 & 32.394.143 & 3.610,188 & 32,40 & 8,55 \\
+        200.000 & Aleat. & 200.000 & 44.829.909 & 3.549,683 & 32,70 & 2,50 \\\hline\hline
+    \end{tabular}
+    \caption{\label{tab:m3}Método 3 (ordem 100). Transferências na pesquisa: 0 em todas as linhas. O caso de 2.000.000 não foi executado (Tabela~\ref{tab:limites}).}
+\end{table}
+
+\begin{itemize}
+    \item \textbf{Criação -- transferências}: exatamente $n$, pois o arquivo é lido uma única vez, sequencialmente.
+    \item \textbf{Criação -- comparações}: crescem mais que $n \log n$ porque, com páginas de até 200 registros, a descida na página e o deslocamento em \texttt{inserirNaPagina} são sequenciais. Por registro inserido são cerca de 52 (100 registros) e de 162 a 308 (200.000). O ascendente é o mais caro (61,7 milhões com 200.000), porque toda inserção vai para a página mais à direita e percorre todas as chaves dela; no descendente a posição é achada logo na primeira chave (32,4 milhões).
+    \item \textbf{Criação -- tempo}: aqui a ordem do arquivo pesa muito. Com 200.000 registros o ascendente leva 0,41 s, contra cerca de 3,6 s no descendente e no aleatório. No ascendente cada registro entra no fim da página e nada é deslocado; no descendente ele entra no início e \texttt{inserirNaPagina} precisa empurrar até 200 registros de 5 KB (cerca de 1 MB de cópia por inserção). Com a ordem 2 usada antes, os três casos ficavam em torno de 0,75 s.
+    \item \textbf{Pesquisa -- comparações}: logarítmicas e praticamente independentes da ordem do arquivo: de 10,4 (100 registros) para cerca de 33 (200.000). A árvore ficou bem mais baixa (3 níveis com 200.000), mas o total de comparações quase não mudou, porque a pesquisa binária dentro de cada página faz cerca de $\log_2$ do tamanho da página; no total continuam sendo cerca de $\log_2 n$ passos, cada um com duas comparações.
+    \item \textbf{Pesquisa -- tempo}: abaixo de 9 $\mu$s em todos os casos. Assim como antes, o aleatório pesquisa mais rápido que os ordenados nos tamanhos maiores, efeito do arranjo das páginas na memória e não do algoritmo. Valores abaixo de 1 $\mu$s estão no limite da resolução do relógio e servem só como ordem de grandeza.
+    \item \textbf{Memória}: com 200.000 registros o pico do processo ficou entre 1,0 e 1,3 GB (antes, com ordem 2, chegava a 2,2 GB).
+    \item \textbf{Por que não há teste com 2.000.000}: como a árvore guarda os registros completos na memória principal, ela precisaria de cerca de 10 a 13 GB de RAM. A máquina tem 16 GB, que também são usados pelo sistema operacional; o processo passaria a usar \emph{swap} e a criação ficaria muito lenta. Também faltaria espaço em disco, já que cada arquivo de 2.000.000 de registros tem cerca de 10 GB.
+\end{itemize}
+
+\subsection{Método 4 -- Árvore B*}
+
+\begin{table}[!htb]
+    \centering
+    \small
+    \begin{tabular}{|r|l|r|r|r|r|r|}
+        \hline\hline
+        & & \multicolumn{3}{c|}{Criação} & \multicolumn{2}{c|}{Pesquisa (média)} \\\hline
+        Registros & Situação & Transf. & Comp. & Tempo (ms) & Comp. & Tempo ($\mu$s) \\\hline
+        100     & Asc.   & 100     & 5.049      & 0,102     & 51,00  & 0,20 \\
+        100     & Desc.  & 100     & 5.148      & 0,578     & 51,00  & 0,00 \\
+        100     & Aleat. & 100     & 5.234      & 0,352     & 51,00  & 0,10 \\\hline
+        200     & Asc.   & 200     & 12.850     & 0,215     & 40,50  & 0,15 \\
+        200     & Desc.  & 200     & 12.900     & 1,568     & 40,50  & 0,35 \\
+        200     & Aleat. & 200     & 12.770     & 0,809     & 39,50  & 0,15 \\\hline
+        2.000   & Asc.   & 2.000   & 187.486    & 2,365     & 49,80  & 0,65 \\
+        2.000   & Desc.  & 2.000   & 153.138    & 16,920    & 46,45  & 0,65 \\
+        2.000   & Aleat. & 2.000   & 163.136    & 9,516     & 47,75  & 0,20 \\\hline
+        20.000  & Asc.   & 20.000  & 2.940.651  & 25,450    & 66,25  & 1,55 \\
+        20.000  & Desc.  & 20.000  & 1.589.845  & 179,386   & 61,55  & 2,60 \\
+        20.000  & Aleat. & 20.000  & 2.155.194  & 118,890   & 73,10  & 0,80 \\\hline
+        200.000 & Asc.   & 200.000 & 37.705.372 & 281,684   & 94,25  & 4,15 \\
+        200.000 & Desc.  & 200.000 & 15.996.230 & 1.855,532 & 95,85  & 3,05 \\
+        200.000 & Aleat. & 200.000 & 24.516.899 & 2.178,756 & 100,95 & 1,70 \\\hline\hline
+    \end{tabular}
+    \caption{\label{tab:m4}Método 4 (páginas de 100 itens). Transferências na pesquisa: 0 em todas as linhas. O caso de 2.000.000 não foi executado (Tabela~\ref{tab:limites}).}
+\end{table}
+
+\begin{itemize}
+    \item \textbf{Criação -- transferências}: exatamente $n$, uma leitura sequencial do arquivo.
+    \item \textbf{Criação -- comparações}: menores que as da árvore B em todos os casos (37,7 milhões contra 61,7 milhões no ascendente com 200.000), porque as folhas e as páginas internas têm metade do tamanho das páginas da B. Como na B, o ascendente é o mais caro e o descendente o mais barato (16,0 milhões).
+    \item \textbf{Criação -- tempo}: de 35\% a 50\% menor que na árvore B (0,28 s contra 0,41 s no ascendente e cerca de 2 s contra 3,6 s nos demais, com 200.000). Os deslocamentos nas folhas movem no máximo 100 registros (cerca de 500 KB), e as divisões de páginas internas movem só chaves inteiras. A ordem do arquivo afeta o tempo pelo mesmo motivo da árvore B.
+    \item \textbf{Pesquisa -- comparações}: crescem devagar com $n$, mas são as maiores entre as árvores: 51 com 100 registros (uma única folha de 100, pesquisada sequencialmente) e cerca de 95 a 101 com 200.000. Como a pesquisa é sequencial dentro de cada página, cada nível custa em média metade da página. O valor de 200 registros (40) é menor que o de 100 porque, depois da primeira divisão, as folhas ficam com 50 a 100 registros.
+    \item \textbf{Pesquisa -- tempo}: até 4,15 $\mu$s, em geral o menor entre os métodos apesar de mais comparações (a exceção é o descendente com 20.000, em que a B foi mais rápida). A explicação provável é a cache do processador: as chaves de uma página interna ficam juntas num vetor de \texttt{int}, enquanto na árvore B cada chave comparada está dentro de um registro de 5 KB.
+    \item \textbf{Memória}: pico de 1,1 a 1,9 GB com 200.000 registros, o maior valor no ascendente. Nesse caso as folhas divididas ficam só com metade dos registros e não recebem mais inserções.
+    \item \textbf{Por que não há teste com 2.000.000}: pelo mesmo motivo da árvore B. Os registros ficam nas folhas, em memória principal, e a árvore precisaria de cerca de 11 a 19 GB, acima do que a máquina tem livre. Com o \emph{swap}, o tempo de criação cresceria muito, e os arquivos de teste ocupariam cerca de 30 GB de disco.
+\end{itemize}
+
+\subsection{Análise comparativa}
+
+As Figuras~\ref{fig:comp} e \ref{fig:tempo} comparam os quatro métodos (método 1 no arquivo ascendente; métodos 2, 3 e 4 no arquivo aleatório) em escala logarítmica, e a Tabela~\ref{tab:resumo} resume o comportamento de cada um.
+
+\begin{figure}[!htb]
+    \centering
+    \begin{tikzpicture}
+    \begin{loglogaxis}[
+        width=0.85\linewidth, height=7cm,
+        xlabel={Número de registros}, ylabel={Comparações (média)},
+        legend pos=north west, legend style={font=\small},
+        grid=major]
+    \addplot+[mark=square*] coordinates {(100,51.05) (200,52.05) (2000,61.5) (20000,151.5) (200000,1051.5) (2000000,10051.5)};
+    \addplot+[mark=triangle*] coordinates {(100,16.4) (200,17.5) (2000,24.6) (20000,34.2) (200000,41.0) (2000000,53.8)};
+    \addplot+[mark=*] coordinates {(100,10.4) (200,13.0) (2000,18.8) (20000,25.6) (200000,32.7)};
+    \addplot+[mark=diamond*] coordinates {(100,51.0) (200,39.5) (2000,47.75) (20000,73.1) (200000,100.95)};
+    \legend{1 -- ASI, 2 -- Binária, 3 -- Árvore B, 4 -- Árvore B*}
+    \end{loglogaxis}
+    \end{tikzpicture}
+    \caption{Comparações médias por pesquisa.}
+    \label{fig:comp}
+\end{figure}
+
+\begin{figure}[!htb]
+    \centering
+    \begin{tikzpicture}
+    \begin{loglogaxis}[
+        width=0.85\linewidth, height=7cm,
+        xlabel={Número de registros}, ylabel={Tempo de criação (ms)},
+        legend pos=north west, legend style={font=\small},
+        grid=major]
+    \addplot+[mark=square*] coordinates {(100,0.100) (200,0.021) (2000,0.064) (20000,0.873) (200000,3.640) (2000000,2371.288)};
+    \addplot+[mark=triangle*] coordinates {(100,1.63) (200,2.64) (2000,33.18) (20000,475.72) (200000,5641.92) (2000000,817895.59)};
+    \addplot+[mark=*] coordinates {(100,0.386) (200,1.296) (2000,17.342) (20000,215.815) (200000,3549.683)};
+    \addplot+[mark=diamond*] coordinates {(100,0.352) (200,0.809) (2000,9.516) (20000,118.890) (200000,2178.756)};
+    \legend{1 -- ASI, 2 -- Binária, 3 -- Árvore B, 4 -- Árvore B*}
+    \end{loglogaxis}
+    \end{tikzpicture}
+    \caption{Tempo de criação do índice.}
+    \label{fig:tempo}
+\end{figure}
+
+\begin{table}[!htb]
+    \centering
+    \footnotesize
+    \begin{tabular}{|p{0.15\linewidth}|p{0.13\linewidth}|p{0.15\linewidth}|p{0.15\linewidth}|p{0.12\linewidth}|p{0.14\linewidth}|}
+        \hline\hline
+        Método & Situações & Criação (transf.) & Pesquisa (transf.) & Pesquisa (comp.) & Memória interna \\\hline
+        1 -- ASI & Só ascendente & $n/100$ & 100 (constante) & Linear em $n$ & Só a tabela de páginas \\\hline
+        2 -- Binária externa & Todas; viável só na aleatória & $n \log n$ (aleat.) / $n^2/2$ (ord.) & $\log n$ (aleat.) / $n/2$ (ord.) & $2\times$ as transf. & Nenhuma (tudo em disco) \\\hline
+        3 -- Árvore B & Todas & $n$ & 0 & $\log n$ (a menor) & Árvore inteira (até 1,3 GB com 200.000) \\\hline
+        4 -- Árvore B* & Todas & $n$ & 0 & Proporcional à altura vezes o tamanho da página & Árvore inteira (até 1,9 GB com 200.000) \\\hline\hline
+    \end{tabular}
+    \caption{\label{tab:resumo}Resumo comparativo dos métodos.}
+\end{table}
+
+\begin{itemize}
+    \item \textbf{Criação do índice}: o acesso sequencial indexado é imbatível (2.000 leituras e 3,6 ms com 200.000 registros) porque lê só um registro por página. Entre as árvores, a B* criou o índice de 35\% a 50\% mais rápido que a B, e a binária aleatória foi a mais lenta (5,6 s com 200.000) por ler do disco cada nodo visitado. Com páginas de 100 itens, porém, a criação das árvores B e B* no arquivo aleatório ficou bem mais lenta que antes (3,5 s e 2,2 s com 200.000), por causa do deslocamento de registros de 5 KB dentro de páginas grandes.
+    \item \textbf{Pesquisa -- transferências}: as árvores B e B* não fazem nenhuma, pois mantêm os registros em RAM; o método 1 faz sempre 100; a binária aleatória faz cerca de $1{,}39 \log_2 n$ (27 com 2.000.000).
+    \item \textbf{Pesquisa -- comparações}: a Figura~\ref{fig:comp} mostra a diferença de crescimento. O método 1 é linear (de 200.000 para 2.000.000 as comparações passam de 1.051 para 10.051, quase 10 vezes mais); as árvores crescem devagar. A B faz menos comparações (33 com 200.000) porque usa pesquisa binária dentro da página; a binária aleatória vem logo acima (41); a B*, com pesquisa sequencial em páginas de 100 chaves, é a que mais compara entre as árvores (cerca de 100), mas ainda bem menos que o método 1.
+    \item \textbf{Pesquisa -- tempo}: B* (até 4,2 $\mu$s) $<$ B (até 8,6 $\mu$s) $<$ método 1 (17 a 227 $\mu$s) $<$ binária aleatória (13 $\mu$s a 4,8 ms). A binária com arquivo ordenado é a pior de todas (7,5 ms com só 20.000 registros). A B* é, em geral, a mais rápida mesmo comparando mais, provavelmente porque percorre vetores contíguos de \texttt{int}, enquanto a B compara chaves espalhadas em registros de 5 KB.
+    \item \textbf{Ordem do arquivo}: não altera a pesquisa nas árvores B e B*, que se mantêm balanceadas, e altera apenas o custo de criação: o ascendente é o mais caro em comparações, mas o mais rápido em tempo, porque não exige deslocar registros dentro das páginas. Na árvore binária, arquivo ordenado transforma o custo logarítmico em linear na pesquisa e em quadrático na criação.
+    \item \textbf{Escala}: com 2.000.000 de registros, os métodos que dependem do disco ficaram muito mais lentos (criação de 2,4 s no método 1 e de 818 s na binária), e as árvores B e B* não foram executadas por causa do uso de memória (Tabela~\ref{tab:limites}).
+\end{itemize}
+
+\clearpage
+\section{Considerações Finais}
+
+As árvores B* e B foram os métodos mais eficientes na pesquisa (a B* com o menor tempo, a B com o menor número de comparações); o acesso sequencial indexado teve o índice mais barato; e a árvore binária só é viável com arquivo aleatório, situação em que foi o único método testado com 2.000.000 de registros guardando os dados somente em disco.
+
+As principais dificuldades encontradas na implementação foram:
+
+\begin{itemize}
+    \item \textbf{Árvore B*}: foi o método mais trabalhoso. A divisão de páginas internas precisou ser refeita (juntar as chaves num vetor temporário antes de dividir), e os nomes de funções e tipos entraram em conflito com os da árvore B no mesmo programa e precisaram ser renomeados.
+    \item \textbf{Uso de memória}: como as páginas das árvores B e B* guardam registros de 5 KB, o consumo de RAM cresce muito rápido. Na B* as páginas internas passaram a ser alocadas só com o tamanho da parte interna da \texttt{union}; mesmo assim não foi possível testar 2.000.000 de registros nas duas árvores. Guardar nas páginas apenas a chave e a posição do registro no arquivo resolveria isso, ao custo de uma transferência por pesquisa.
+    \item \textbf{Árvore binária em disco}: manter os ponteiros como posições no arquivo e regravar o pai a cada inserção exigiu cuidado com \texttt{fseek}; além disso, a degeneração com arquivos ordenados tornou inviáveis os testes grandes nessas situações.
+    \item \textbf{Medição justa}: foi preciso separar claramente o que entra em cada medição: as impressões ficam fora, e toda comparação entre chaves passa pela macro \texttt{COMP}, para que a contagem seja uniforme entre os métodos.
+    \item \textbf{Arquivos grandes}: um arquivo de 2.000.000 de registros ocupa cerca de 10 GB (mais 10 GB do arquivo da árvore binária), o que exigiu apagar os arquivos entre os testes.
+\end{itemize}
+
+Como melhorias futuras, destacam-se o uso de pesquisa binária na tabela de índice do método 1 e dentro das páginas da árvore B* (o que tornaria as comparações logarítmicas nos dois casos) e o armazenamento apenas de chave e posição nas páginas das árvores B e B*, permitindo testá-las com 2.000.000 de registros.
+
+\clearpage
+\bibliographystyle{plain}
+\bibliography{refs}
+
+\end{document}
