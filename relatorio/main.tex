@@ -36,7 +36,7 @@ O programa trabalha com arquivos de 100, 200, 2.000, 20.000, 200.000 e 2.000.000
 Algumas ferramentas foram utilizadas durante a criação deste projeto:
 
 \begin{itemize}
-  \item Ambiente de desenvolvimento do código fonte: ????. % PREENCHER
+  \item Ambiente de desenvolvimento do código fonte: Visual Studio Code.
   \item Linguagem utilizada: C.
   \item Compilador: \texttt{gcc}, automatizado por \texttt{Makefile}.
   \item Ambiente de desenvolvimento da documentação: Overleaf \LaTeX. \footnote{Disponível em \url{https://www.overleaf.com/}}
@@ -495,9 +495,9 @@ Foram medidos, para a criação do índice e para a pesquisa, o número de trans
 
 \begin{itemize}
     \item Quantidades: 100, 200, 2.000, 20.000, 200.000 e 2.000.000 registros, nas três situações de ordem.
-    \item Em cada combinação, o índice foi criado uma vez e foram pesquisadas 20 chaves distintas, igualmente espaçadas entre $1$ e $n$ (todas existentes), conforme o Código~\ref{lst:chaves}. As tabelas mostram as médias dessas 20 pesquisas; todas as chaves foram encontradas em todos os testes.
-    \item A execução foi automatizada por um script de shell que chama o programa uma vez para cada chave (Código~\ref{lst:chaves}), de modo que o índice é recriado a cada execução. As métricas de criação são as médias dessas 20 execuções; transferências e comparações de criação não variam entre elas, só o tempo.
-    \item Os métodos 3 e 4 foram medidos novamente depois que o tamanho das páginas passou para 100 (árvore B de ordem 100 e árvore B* com 100 itens por página). As medições dos métodos 1 e 2, cujo código não mudou, foram mantidas.
+    \item Em cada combinação foram pesquisadas 20 chaves distintas, igualmente espaçadas entre $1$ e $n$ (todas existentes), conforme o Código~\ref{lst:chaves}. As tabelas mostram as médias dessas 20 pesquisas; todas as chaves foram encontradas em todos os testes.
+    \item Métodos 1 e 2: foram medidos com uma versão anterior do programa, que tinha um modo de experimento em que o índice era criado uma única vez e as 20 chaves eram pesquisadas em seguida. Como o código desses dois métodos não mudou depois, essas medições foram mantidas.
+    \item Métodos 3 e 4: foram medidos novamente depois que o tamanho das páginas passou para 100 (árvore B de ordem 100 e árvore B* com 100 itens por página). Como o modo de experimento já tinha sido removido, a execução foi automatizada por um script de shell que chama o programa uma vez para cada chave (Código~\ref{lst:chaves}), de modo que o índice é recriado a cada execução. As métricas de criação são as médias dessas 20 execuções; transferências e comparações de criação não variam entre elas, só o tempo.
 \end{itemize}
 
 \begin{lstlisting}[caption={Escolha das 20 chaves do experimento (script de shell).},label={lst:chaves},language=sh]
