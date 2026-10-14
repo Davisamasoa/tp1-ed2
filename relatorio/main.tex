@@ -63,10 +63,10 @@ A máquina onde o desenvolvimento e os testes foram realizados possui a seguinte
 Para a compilação do projeto, basta digitar:
 
 \begin{tcolorbox}[title=Compilando o projeto,width=\linewidth]
-    \texttt{make TARGET=pesquisa}
+    \texttt{make}
 \end{tcolorbox}
 
-O \texttt{Makefile} compila cada módulo (\texttt{main.c}, \texttt{metricas.c}, \texttt{asi.c}, \texttt{gerador.c}, \texttt{pB.c}, \texttt{avB.c} e \texttt{aE.c}) com as seguintes opções:
+O \texttt{Makefile} compila cada módulo (\texttt{main.c}, \texttt{metricas.c}, \texttt{asi.c}, \texttt{gerador.c}, \texttt{pB.c}, \texttt{avB.c} e \texttt{aE.c}) e gera o executável \texttt{pesquisa}, com as seguintes opções:
 \begin{itemize}
     \item [-] \emph{-std=c11}: padrão da linguagem C usado no projeto.
     \item [-] \emph{-Wall -Wextra}: para mostrar todos os possíveis \emph{warnings} do código.
