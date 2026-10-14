@@ -191,7 +191,6 @@ int main(int argc, char *argv[]) {
   // sem a quantidade certa de argumentos, mostra como usar o programa
   if (argc < 5 || argc > 6) {
     printf("Uso: %s <metodo> <quantidade> <situacao> <chave> [-P]\n", argv[0]);
-    printf("     %s <metodo> <quantidade> <situacao> [-P]\n", argv[0]);
     printf("  metodo    : 1 (acesso sequencial indexado), 2 (arvore binaria),\n"
            "              3 (arvore B), 4 (arvore B*)\n");
     printf("  situacao  : 1 (ascendente), 2 (descendente), 3 (aleatorio)\n");
@@ -218,7 +217,13 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  chave = atoi(argv[4]);
+  // usa strtol para conseguir detectar quando a chave nao e um numero inteiro
+  char *fimChave;
+  chave = strtol(argv[4], &fimChave, 10);
+  if (fimChave == argv[4] || *fimChave != '\0') {
+    printf("Erro: chave invalida. Deve ser um numero inteiro.\n");
+    return 1;
+  }
 
   // o unico argumento opcional aceito e o -P
   if (argc == 6) {

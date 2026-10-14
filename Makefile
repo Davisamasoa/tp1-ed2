@@ -1,6 +1,6 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -std=c11 -O2
-TARGET  = exe
+TARGET  = pesquisa
 
 empty:=
 space:= $(empty) $(empty)
